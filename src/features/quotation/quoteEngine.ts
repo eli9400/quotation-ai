@@ -50,5 +50,11 @@ export function generateQuote({ request, documentCount }: QuoteInput): Quote {
     estimatedDays,
     confidence: Math.round(confidence * 100),
     summary,
+    assumptions: [
+      'המחיר מבוסס על אומדן מקומי בלבד.',
+      'כולל טווח עבודה סטנדרטי לפי היקף ודחיפות.',
+      'נדרש אימות ידני לפני שליחה סופית ללקוח.',
+    ],
+    generatedAt: new Date().toISOString(),
   }
 }

@@ -4,12 +4,14 @@ import { Panel } from '../ui/Panel'
 
 type DocumentsPanelProps = {
   documents: UploadedDocument[]
+  isUploading: boolean
   onFilesSelected: (files: FileList | null) => void
   onRemoveDocument: (documentId: string) => void
 }
 
 export function DocumentsPanel({
   documents,
+  isUploading,
   onFilesSelected,
   onRemoveDocument,
 }: DocumentsPanelProps) {
@@ -21,9 +23,13 @@ export function DocumentsPanel({
           type="file"
           accept=".pdf,.doc,.docx"
           multiple
-          onChange={(event) => onFilesSelected(event.target.files)}
+          disabled={isUploading}
+          onChange={(event) => {
+            onFilesSelected(event.target.files)
+            event.currentTarget.value = ''
+          }}
         />
-        <strong>לחץ להעלאת קבצים</strong>
+        <strong>{isUploading ? 'מעלה קבצים...' : 'לחץ להעלאת קבצים'}</strong>
         <small>אפשר להעלות כמה קבצים ביחד</small>
       </label>
 
@@ -39,7 +45,11 @@ export function DocumentsPanel({
                   {formatMegabytes(doc.size)} | {doc.uploadedAt}
                 </small>
               </div>
-              <button type="button" onClick={() => onRemoveDocument(doc.id)}>
+              <button
+                type="button"
+                disabled={isUploading}
+                onClick={() => onRemoveDocument(doc.id)}
+              >
                 הסר
               </button>
             </li>

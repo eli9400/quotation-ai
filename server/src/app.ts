@@ -4,6 +4,7 @@ import multer from 'multer'
 import { env } from './config/env.js'
 import { documentsRouter } from './routes/documents.route.js'
 import { healthRouter } from './routes/health.route.js'
+import { quotesRouter } from './routes/quotes.route.js'
 import { trainingRouter } from './routes/training.route.js'
 
 export const app = express()
@@ -14,6 +15,7 @@ app.use(express.json({ limit: '5mb' }))
 app.use('/api', healthRouter)
 app.use('/api', documentsRouter)
 app.use('/api', trainingRouter)
+app.use('/api', quotesRouter)
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   if (error instanceof multer.MulterError) {

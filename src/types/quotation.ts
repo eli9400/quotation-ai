@@ -17,6 +17,8 @@ export type Quote = {
   estimatedDays: number
   confidence: number
   summary: string
+  assumptions: string[]
+  generatedAt: string
 }
 
 export type ClientRequestForm = {
@@ -26,3 +28,18 @@ export type ClientRequestForm = {
   urgency: UrgencyLevel
   requirements: string
 }
+
+export type TrainingStatus = 'running' | 'completed' | 'failed'
+
+export type TrainingJob = {
+  id: string
+  status: TrainingStatus
+  progress: number
+  documentIds: string[]
+  startedAt: string
+  updatedAt: string
+  completedAt: string | null
+  errorMessage: string | null
+}
+
+export type QuoteSource = 'openai' | 'fallback'

@@ -20,6 +20,7 @@ type OnFieldChange = <K extends keyof ClientRequestForm>(
 type QuoteRequestPanelProps = {
   form: ClientRequestForm
   disabled: boolean
+  isSubmitting: boolean
   onFieldChange: OnFieldChange
   onSubmit: () => void
 }
@@ -27,6 +28,7 @@ type QuoteRequestPanelProps = {
 export function QuoteRequestPanel({
   form,
   disabled,
+  isSubmitting,
   onFieldChange,
   onSubmit,
 }: QuoteRequestPanelProps) {
@@ -81,8 +83,8 @@ export function QuoteRequestPanel({
           onChange={(event) => onFieldChange('requirements', event.target.value)}
         />
 
-        <PrimaryButton type="submit" disabled={disabled}>
-          הפק הצעת מחיר אוטומטית
+        <PrimaryButton type="submit" disabled={disabled || isSubmitting}>
+          {isSubmitting ? 'מפיק הצעה...' : 'הפק הצעת מחיר אוטומטית'}
         </PrimaryButton>
       </form>
     </Panel>

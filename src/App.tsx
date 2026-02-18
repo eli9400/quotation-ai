@@ -13,10 +13,14 @@ function App() {
     trainingProgress,
     trainingStatus,
     isTraining,
+    isUploading,
+    isGeneratingQuote,
     canTrain,
     modelReady,
     form,
     quote,
+    quoteSource,
+    errorMessage,
     addDocuments,
     removeDocument,
     startTraining,
@@ -32,6 +36,7 @@ function App() {
       <section className="content-grid">
         <DocumentsPanel
           documents={documents}
+          isUploading={isUploading}
           onFilesSelected={addDocuments}
           onRemoveDocument={removeDocument}
         />
@@ -45,11 +50,18 @@ function App() {
         <QuoteRequestPanel
           form={form}
           disabled={!modelReady}
+          isSubmitting={isGeneratingQuote}
           onFieldChange={updateFormField}
           onSubmit={createQuoteFromForm}
         />
-        <QuoteResultPanel quote={quote} clientName={form.clientName} />
+        <QuoteResultPanel
+          quote={quote}
+          quoteSource={quoteSource}
+          clientName={form.clientName}
+        />
       </section>
+
+      {errorMessage ? <p className="error-banner">{errorMessage}</p> : null}
     </main>
   )
 }
