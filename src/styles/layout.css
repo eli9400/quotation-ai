@@ -79,6 +79,19 @@
   display: grid;
   gap: 0.9rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.model-column {
+  display: grid;
+  gap: 0.9rem;
+  align-content: start;
+}
+
+.single-panel-grid {
+  margin-top: 0.9rem;
+  display: grid;
+  grid-template-columns: 1fr;
 }
 
 @media (max-width: 980px) {

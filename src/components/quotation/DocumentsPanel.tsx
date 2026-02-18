@@ -1,5 +1,5 @@
-import { formatMegabytes } from '../../utils/formatters'
 import type { UploadedDocument } from '../../types/quotation'
+import { formatMegabytes } from '../../utils/formatters'
 import { Panel } from '../ui/Panel'
 
 type DocumentsPanelProps = {
@@ -21,7 +21,7 @@ export function DocumentsPanel({
         <input
           id="docsUpload"
           type="file"
-          accept=".pdf,.doc,.docx"
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.csv"
           multiple
           disabled={isUploading}
           onChange={(event) => {
@@ -29,8 +29,8 @@ export function DocumentsPanel({
             event.currentTarget.value = ''
           }}
         />
-        <strong>{isUploading ? 'מעלה קבצים...' : 'לחץ להעלאת קבצים'}</strong>
-        <small>אפשר להעלות כמה קבצים ביחד</small>
+        <strong>{isUploading ? 'מעלה קבצים...' : 'לחצו להעלאת קבצים'}</strong>
+        <small>PDF, DOCX, XLS, XLSX, CSV (אפשר כמה קבצים ביחד)</small>
       </label>
 
       {documents.length === 0 ? (
@@ -45,11 +45,7 @@ export function DocumentsPanel({
                   {formatMegabytes(doc.size)} | {doc.uploadedAt}
                 </small>
               </div>
-              <button
-                type="button"
-                disabled={isUploading}
-                onClick={() => onRemoveDocument(doc.id)}
-              >
+              <button type="button" disabled={isUploading} onClick={() => onRemoveDocument(doc.id)}>
                 הסר
               </button>
             </li>

@@ -10,19 +10,16 @@ type QuoteResultPanelProps = {
 
 const SOURCE_LABEL: Record<QuoteSource, string> = {
   openai: 'OpenAI',
+  learned: 'מודל נלמד',
   fallback: 'Fallback',
 }
 
-export function QuoteResultPanel({
-  quote,
-  quoteSource,
-  clientName,
-}: QuoteResultPanelProps) {
+export function QuoteResultPanel({ quote, quoteSource, clientName }: QuoteResultPanelProps) {
   return (
     <Panel title="תוצאה אוטומטית" className="quote-panel">
       {!quote ? (
         <p className="empty">
-          אחרי שהמודל מוכן, מלא פרטי לקוח ולחץ על "הפק הצעת מחיר אוטומטית".
+          אחרי שהמודל מוכן, מלאו פרטי לקוח ולחצו על ״הפק הצעת מחיר אוטומטית״.
         </p>
       ) : (
         <div className="quote-result">

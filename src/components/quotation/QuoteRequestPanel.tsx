@@ -48,14 +48,22 @@ export function QuoteRequestPanel({
           onChange={(event) => onFieldChange('clientName', event.target.value)}
         />
 
+        <TextInputField
+          id="clientEmail"
+          label="אימייל לקוח"
+          type="email"
+          autoComplete="email"
+          value={form.clientEmail}
+          placeholder="client@example.com"
+          onChange={(event) => onFieldChange('clientEmail', event.target.value)}
+        />
+
         <SelectField
           id="projectType"
           label="סוג פרויקט"
           value={form.projectType}
           options={projectOptions}
-          onChange={(event) =>
-            onFieldChange('projectType', event.target.value as ProjectType)
-          }
+          onChange={(event) => onFieldChange('projectType', event.target.value as ProjectType)}
         />
 
         <SelectField

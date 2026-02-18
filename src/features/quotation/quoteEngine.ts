@@ -46,6 +46,20 @@ export function generateQuote({ request, documentCount }: QuoteInput): Quote {
   ].join(' | ')
 
   return {
+    lineItems: [
+      {
+        id: 'local_estimate',
+        sourceItemId: null,
+        description: 'אומדן מקומי',
+        unit: 'custom',
+        quantity: 1,
+        unitPrice: estimatedPrice,
+        lineTotal: estimatedPrice,
+      },
+    ],
+    subtotalBeforeVat: estimatedPrice,
+    vatRate: 0,
+    vatAmount: 0,
     estimatedPrice,
     estimatedDays,
     confidence: Math.round(confidence * 100),

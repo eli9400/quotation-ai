@@ -1,0 +1,168 @@
+.quote-row {
+  cursor: pointer;
+}
+
+.quote-row:hover td {
+  background: #f4fcf8;
+}
+
+.quote-row.active td {
+  background: #eaf7f1;
+}
+
+.quote-details-panel {
+  margin-top: 0.85rem;
+  border: 1px solid #d6e8e0;
+  border-radius: 14px;
+  padding: 0.8rem;
+  background: #fbfffd;
+}
+
+.quote-details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.quote-details-header h4 {
+  margin: 0;
+}
+
+.quote-details-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.quote-status-badge {
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid #cadfd6;
+  font-size: 0.83rem;
+  font-weight: 700;
+}
+
+.quote-status-badge.draft {
+  color: #5b6f68;
+  background: #f2f7f5;
+}
+
+.quote-status-badge.approved {
+  color: #165b49;
+  border-color: #a8d4c2;
+  background: #e8f8f1;
+}
+
+.quote-details-grid {
+  margin-top: 0.7rem;
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: 1fr 1fr;
+}
+
+.quote-readonly-card {
+  border: 1px solid #dcebe5;
+  border-radius: 12px;
+  padding: 0.65rem;
+  background: #f8fdfb;
+}
+
+.quote-readonly-card strong {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.quote-readonly-card p {
+  margin: 0.32rem 0;
+}
+
+.quote-edit-form {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.quote-edit-form label {
+  display: grid;
+  gap: 0.22rem;
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.quote-edit-form input,
+.quote-edit-form textarea {
+  border: 1px solid #d7e7e0;
+  border-radius: 10px;
+  padding: 0.58rem 0.68rem;
+  font: inherit;
+  color: var(--text-strong);
+  background: #fff;
+}
+
+.quote-edit-form textarea {
+  resize: vertical;
+}
+
+.quote-lines-table-wrap {
+  border: 1px solid #dcebe5;
+  border-radius: 10px;
+  overflow-x: auto;
+}
+
+.quote-lines-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 640px;
+}
+
+.quote-lines-table th,
+.quote-lines-table td {
+  border-bottom: 1px solid #e5f0eb;
+  padding: 0.35rem;
+  text-align: right;
+}
+
+.quote-lines-table input {
+  width: 100%;
+  min-width: 90px;
+}
+
+.quote-line-add,
+.quote-line-remove {
+  border: 1px solid #cfe1d9;
+  background: #f7fcfa;
+  color: #255f50;
+  border-radius: 10px;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+  font: inherit;
+}
+
+.quote-line-remove {
+  border-color: #e4cccc;
+  color: #8f4343;
+  background: #fff6f6;
+}
+
+.quote-totals {
+  border: 1px solid #dcebe5;
+  border-radius: 10px;
+  padding: 0.6rem;
+  background: #f9fffc;
+}
+
+.quote-totals p {
+  margin: 0.25rem 0;
+}
+
+.quote-edit-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 980px) {
+  .quote-details-grid {
+    grid-template-columns: 1fr;
+  }
+}

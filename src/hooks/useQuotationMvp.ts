@@ -1,104 +1,152 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  generateQuote,
+  deleteDocument,
+  getLatestCompletedTrainingJob,
   getTrainingJob,
+  listDocuments,
   startTraining,
   uploadDocuments,
 } from '../services/api/quotationApi'
-import type {
-  ClientRequestForm,
-  Quote,
-  QuoteSource,
-  UploadedDocument,
-} from '../types/quotation'
+import type { UploadedDocument } from '../types/quotation'
+import { useQuoteHistory } from './useQuoteHistory'
 
-const INITIAL_FORM: ClientRequestForm = {
-  clientName: '',
-  projectType: 'renovation',
-  scope: 'medium',
-  urgency: 'normal',
-  requirements: '',
-}
 const TRAINING_POLL_MS = 850
-
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message
   }
   return 'אירעה שגיאה בלתי צפויה.'
 }
+function idsSignature(ids: string[]): string {
+  return ids.slice().sort().join('|')
+}
+function toDisplayDate(value: string): string {
+  return new Date(value).toLocaleString('he-IL')
+}
 
-export function useQuotationMvp() {
+export function useQuotationMvp(authToken: string | null) {
   const [documents, setDocuments] = useState<UploadedDocument[]>([])
   const [trainingProgress, setTrainingProgress] = useState(0)
   const [isTraining, setIsTraining] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
-  const [isGeneratingQuote, setIsGeneratingQuote] = useState(false)
+  const [trainedDocumentIds, setTrainedDocumentIds] = useState<string[] | null>(null)
   const [trainingReadyAt, setTrainingReadyAt] = useState<string | null>(null)
   const [trainingJobId, setTrainingJobId] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [form, setForm] = useState<ClientRequestForm>(INITIAL_FORM)
-  const [quote, setQuote] = useState<Quote | null>(null)
-  const [quoteSource, setQuoteSource] = useState<QuoteSource | null>(null)
   const trainingTimerRef = useRef<number | null>(null)
   const pollInFlightRef = useRef(false)
 
-  const canTrain = documents.length > 0 && !isTraining && !isUploading
-  const modelReady = trainingProgress === 100 && trainingJobId !== null
+  const handleQuoteHistoryError = useCallback((message: string) => {
+    setErrorMessage(message)
+  }, [])
 
-  useEffect(() => {
-    return () => {
+  const { quoteHistory, isLoadingQuotes, clearQuoteHistory } = useQuoteHistory({
+    authToken,
+    onError: handleQuoteHistoryError,
+  })
+
+  const currentDocumentIds = useMemo(() => documents.map((doc) => doc.id), [documents])
+  const modelReady = trainedDocumentIds !== null && trainingJobId !== null
+  const hasPendingTrainingChanges = useMemo(() => {
+    if (documents.length === 0) return false
+    if (!trainedDocumentIds) return true
+    return idsSignature(currentDocumentIds) !== idsSignature(trainedDocumentIds)
+  }, [currentDocumentIds, documents.length, trainedDocumentIds])
+  const showTrainingPanel = isTraining || isUploading || (documents.length > 0 && (!modelReady || hasPendingTrainingChanges))
+  const canTrain = hasPendingTrainingChanges && !isTraining && !isUploading
+
+  useEffect(
+    () => () => {
       if (trainingTimerRef.current !== null) {
         window.clearInterval(trainingTimerRef.current)
       }
-    }
-  }, [])
-
-  const trainingStatus = useMemo(() => {
-    if (isUploading) {
-      return 'מעלה מסמכים לשרת...'
-    }
-    if (isTraining) {
-      return 'אימון המודל מתבצע על השרת...'
-    }
-    if (modelReady && trainingReadyAt) {
-      return `המודל מוכן לשימוש. זמן עדכון אחרון: ${trainingReadyAt}`
-    }
-    if (documents.length > 0) {
-      return 'המסמכים הועלו. לחץ על "התחל אימון".'
-    }
-    return 'העלה מסמכים כדי להתחיל אימון.'
-  }, [documents.length, isTraining, isUploading, modelReady, trainingReadyAt])
+    },
+    [],
+  )
 
   const clearTrainingPolling = () => {
-    if (trainingTimerRef.current !== null) {
-      window.clearInterval(trainingTimerRef.current)
-      trainingTimerRef.current = null
-    }
+    if (trainingTimerRef.current === null) return
+    window.clearInterval(trainingTimerRef.current)
+    trainingTimerRef.current = null
   }
 
-  const resetTrainingState = () => {
+  const clearRunningState = () => {
     clearTrainingPolling()
     pollInFlightRef.current = false
     setIsTraining(false)
-    setTrainingProgress(0)
-    setTrainingReadyAt(null)
-    setTrainingJobId(null)
-    setQuote(null)
-    setQuoteSource(null)
   }
 
+  useEffect(() => {
+    if (!authToken) {
+      clearRunningState()
+      setDocuments([])
+      setIsUploading(false)
+      setTrainingProgress(0)
+      setTrainedDocumentIds(null)
+      setTrainingReadyAt(null)
+      setTrainingJobId(null)
+      setErrorMessage(null)
+      clearQuoteHistory()
+      return
+    }
+
+    let active = true
+    const loadInitialData = async () => {
+      try {
+        const [storedDocuments, latestTrainingJob] = await Promise.all([
+          listDocuments(authToken),
+          getLatestCompletedTrainingJob(authToken),
+        ])
+
+        if (!active) return
+
+        setDocuments(storedDocuments)
+        if (latestTrainingJob) {
+          setTrainingProgress(100)
+          setTrainingJobId(latestTrainingJob.id)
+          setTrainedDocumentIds(latestTrainingJob.documentIds)
+          setTrainingReadyAt(toDisplayDate(latestTrainingJob.completedAt ?? latestTrainingJob.updatedAt))
+        } else {
+          setTrainingProgress(0)
+          setTrainingJobId(null)
+          setTrainedDocumentIds(null)
+          setTrainingReadyAt(null)
+        }
+      } catch (error) {
+        if (active) {
+          setErrorMessage(getErrorMessage(error))
+        }
+      }
+    }
+
+    void loadInitialData()
+    return () => {
+      active = false
+    }
+  }, [authToken])
+
+  const trainingStatus = useMemo(() => {
+    if (isUploading) return 'מעלה מסמכים לשרת...'
+    if (isTraining) return 'אימון המודל מתבצע על השרת...'
+    if (documents.length === 0) return 'העלו מסמכים כדי להתחיל אימון.'
+    if (hasPendingTrainingChanges) return 'זוהה שינוי במסמכים. לחצו על "התחל אימון" כדי לעדכן את המודל.'
+    if (modelReady && trainingReadyAt) {
+      return `המודל מעודכן ואין שינויים במסמכים. עדכון אחרון: ${trainingReadyAt}`
+    }
+    return 'המסמכים הועלו. לחצו על "התחל אימון".'
+  }, [documents.length, hasPendingTrainingChanges, isTraining, isUploading, modelReady, trainingReadyAt])
+
   const addDocuments = async (files: FileList | null) => {
-    if (!files || files.length === 0) {
+    if (!files || files.length === 0) return
+    if (!authToken) {
+      setErrorMessage('יש להתחבר כנותן שירות לפני העלאת מסמכים.')
       return
     }
 
     setErrorMessage(null)
     setIsUploading(true)
-
     try {
-      const uploaded = await uploadDocuments(Array.from(files))
-      resetTrainingState()
+      const uploaded = await uploadDocuments(authToken, Array.from(files))
       setDocuments((current) => [...uploaded, ...current])
     } catch (error) {
       setErrorMessage(getErrorMessage(error))
@@ -107,39 +155,45 @@ export function useQuotationMvp() {
     }
   }
 
-  const removeDocument = (documentId: string) => {
+  const removeDocument = async (documentId: string) => {
+    if (!authToken) {
+      setErrorMessage('יש להתחבר כנותן שירות לפני הסרת מסמך.')
+      return
+    }
+
     setErrorMessage(null)
-    setDocuments((current) => current.filter((doc) => doc.id !== documentId))
-    resetTrainingState()
+    setIsUploading(true)
+    try {
+      await deleteDocument(authToken, documentId)
+      setDocuments((current) => current.filter((doc) => doc.id !== documentId))
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error))
+    } finally {
+      setIsUploading(false)
+    }
   }
 
-  const pollTrainingStatus = (jobId: string) => {
+  const pollTrainingStatus = (jobId: string, idToken: string) => {
     clearTrainingPolling()
-
     trainingTimerRef.current = window.setInterval(async () => {
-      if (pollInFlightRef.current) {
-        return
-      }
-
+      if (pollInFlightRef.current) return
       pollInFlightRef.current = true
       try {
-        const job = await getTrainingJob(jobId)
+        const job = await getTrainingJob(idToken, jobId)
         setTrainingProgress(job.progress)
 
         if (job.status === 'completed') {
-          clearTrainingPolling()
-          setIsTraining(false)
-          setTrainingReadyAt(
-            new Date(job.completedAt ?? job.updatedAt).toLocaleString('he-IL'),
-          )
+          clearRunningState()
+          setTrainingProgress(100)
+          setTrainingJobId(job.id)
+          setTrainedDocumentIds(job.documentIds)
+          setTrainingReadyAt(toDisplayDate(job.completedAt ?? job.updatedAt))
         } else if (job.status === 'failed') {
-          clearTrainingPolling()
-          setIsTraining(false)
+          clearRunningState()
           setErrorMessage(job.errorMessage ?? 'האימון נכשל בשרת.')
         }
       } catch (error) {
-        clearTrainingPolling()
-        setIsTraining(false)
+        clearRunningState()
         setErrorMessage(getErrorMessage(error))
       } finally {
         pollInFlightRef.current = false
@@ -148,51 +202,19 @@ export function useQuotationMvp() {
   }
 
   const startModelTraining = async () => {
-    if (!canTrain) {
-      return
-    }
+    if (!canTrain || !authToken) return
 
     setErrorMessage(null)
     setIsTraining(true)
-    setQuote(null)
-    setQuoteSource(null)
-
     try {
-      const job = await startTraining(documents.map((doc) => doc.id))
+      const job = await startTraining(authToken, currentDocumentIds)
       setTrainingJobId(job.id)
       setTrainingProgress(job.progress)
       setTrainingReadyAt(null)
-      pollTrainingStatus(job.id)
+      pollTrainingStatus(job.id, authToken)
     } catch (error) {
-      clearTrainingPolling()
-      setIsTraining(false)
+      clearRunningState()
       setErrorMessage(getErrorMessage(error))
-    }
-  }
-
-  const updateFormField = <K extends keyof ClientRequestForm>(
-    field: K,
-    value: ClientRequestForm[K],
-  ) => {
-    setForm((current) => ({ ...current, [field]: value }))
-  }
-
-  const createQuoteFromForm = async () => {
-    if (!modelReady || !trainingJobId || isGeneratingQuote) {
-      return
-    }
-
-    setErrorMessage(null)
-    setIsGeneratingQuote(true)
-
-    try {
-      const result = await generateQuote(trainingJobId, form)
-      setQuote(result.quote)
-      setQuoteSource(result.source)
-    } catch (error) {
-      setErrorMessage(getErrorMessage(error))
-    } finally {
-      setIsGeneratingQuote(false)
     }
   }
 
@@ -202,17 +224,14 @@ export function useQuotationMvp() {
     trainingStatus,
     isTraining,
     isUploading,
-    isGeneratingQuote,
     canTrain,
     modelReady,
-    form,
-    quote,
-    quoteSource,
+    showTrainingPanel,
+    quoteHistory,
+    isLoadingQuotes,
     errorMessage,
     addDocuments,
     removeDocument,
     startTraining: startModelTraining,
-    updateFormField,
-    createQuoteFromForm,
   }
 }

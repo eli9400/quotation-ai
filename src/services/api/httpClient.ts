@@ -1,5 +1,5 @@
 type RequestOptions = {
-  method: 'GET' | 'POST'
+  method: 'GET' | 'POST' | 'DELETE' | 'PATCH'
   body?: BodyInit | null
   headers?: HeadersInit
 }

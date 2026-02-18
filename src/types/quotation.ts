@@ -13,6 +13,10 @@ export type UploadedDocument = {
 }
 
 export type Quote = {
+  lineItems: QuoteLineItem[]
+  subtotalBeforeVat: number
+  vatRate: number
+  vatAmount: number
   estimatedPrice: number
   estimatedDays: number
   confidence: number
@@ -21,12 +25,28 @@ export type Quote = {
   generatedAt: string
 }
 
+export type QuoteLineItem = {
+  id: string
+  sourceItemId: string | null
+  description: string
+  unit: string
+  quantity: number
+  unitPrice: number
+  lineTotal: number
+}
+
 export type ClientRequestForm = {
   clientName: string
+  clientEmail: string
   projectType: ProjectType
   scope: ScopeLevel
   urgency: UrgencyLevel
   requirements: string
+  requestedItems?: Array<{
+    sourceItemId: string
+    label: string
+    quantity: number
+  }>
 }
 
 export type TrainingStatus = 'running' | 'completed' | 'failed'
@@ -42,4 +62,38 @@ export type TrainingJob = {
   errorMessage: string | null
 }
 
-export type QuoteSource = 'openai' | 'fallback'
+export type QuoteSource = 'openai' | 'fallback' | 'learned'
+
+export type QuoteApprovalStatus = 'draft' | 'approved'
+
+export type StoredQuoteRecord = {
+  id: string
+  source: QuoteSource
+  createdAt: string
+  updatedAt: string
+  status: QuoteApprovalStatus
+  approvedAt: string | null
+  clientRequest: ClientRequestForm
+  quote: Quote
+}
+
+export type FormPreviewField = {
+  id: string
+  label: string
+  type: 'number' | 'text' | 'select' | 'textarea'
+  required: boolean
+  order: number
+  sourceItemId: string | null
+  placeholder: string | null
+  hint: string | null
+  options: string[]
+}
+
+export type FormPreviewSchema = {
+  id: string
+  serviceProviderUid: string
+  version: number
+  generatedAt: string
+  sourceItemsCount: number
+  fields: FormPreviewField[]
+}
