@@ -1,34 +1,56 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
+import { DocumentsPanel } from './components/quotation/DocumentsPanel'
+import { QuoteRequestPanel } from './components/quotation/QuoteRequestPanel'
+import { QuoteResultPanel } from './components/quotation/QuoteResultPanel'
+import { TrainingPanel } from './components/quotation/TrainingPanel'
+import { HeroSection } from './components/sections/HeroSection'
+import { StepsSection } from './components/sections/StepsSection'
+import { useQuotationMvp } from './hooks/useQuotationMvp'
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const {
+    documents,
+    trainingProgress,
+    trainingStatus,
+    isTraining,
+    canTrain,
+    modelReady,
+    form,
+    quote,
+    addDocuments,
+    removeDocument,
+    startTraining,
+    updateFormField,
+    createQuoteFromForm,
+  } = useQuotationMvp()
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <main className="app" dir="rtl">
+      <HeroSection />
+      <StepsSection />
+
+      <section className="content-grid">
+        <DocumentsPanel
+          documents={documents}
+          onFilesSelected={addDocuments}
+          onRemoveDocument={removeDocument}
+        />
+        <TrainingPanel
+          status={trainingStatus}
+          progress={trainingProgress}
+          isTraining={isTraining}
+          canTrain={canTrain}
+          onStartTraining={startTraining}
+        />
+        <QuoteRequestPanel
+          form={form}
+          disabled={!modelReady}
+          onFieldChange={updateFormField}
+          onSubmit={createQuoteFromForm}
+        />
+        <QuoteResultPanel quote={quote} clientName={form.clientName} />
+      </section>
+    </main>
   )
 }
 
