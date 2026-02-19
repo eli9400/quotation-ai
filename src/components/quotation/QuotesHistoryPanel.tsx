@@ -165,6 +165,7 @@ export function QuotesHistoryPanel({ authToken, records, isLoading }: QuotesHist
 
       {selectedRecord ? (
         <QuoteDetailsPanel
+          key={`${selectedRecord.id}:${selectedRecord.updatedAt}`}
           record={selectedRecord}
           isSaving={isSaving}
           isApproving={isApproving}

@@ -2,10 +2,13 @@ import type { PricingObservation } from '../types/pricing-observation.js'
 
 type WorldBankEntry = {
   date?: string
-  value?: number | null
+  value?: number | string | null
 }
 
-type WorldBankDataResponse = [unknown, { value?: WorldBankEntry[] }]
+type WorldBankDataResponse = [
+  unknown,
+  WorldBankEntry[] | { value?: WorldBankEntry[] } | null | undefined,
+]
 
 const CPI_WORLD_BANK_URL =
   'https://api.worldbank.org/v2/country/IL/indicator/FP.CPI.TOTL?format=json&per_page=80'
@@ -46,11 +49,21 @@ export async function getYearlyCpiIndices(): Promise<Map<number, number>> {
   }
 
   const payload = (await response.json()) as WorldBankDataResponse
-  const rawEntries = Array.isArray(payload?.[1]?.value) ? payload[1].value : []
+  const secondPart = payload?.[1]
+  const rawEntries = Array.isArray(secondPart)
+    ? secondPart
+    : Array.isArray(secondPart?.value)
+      ? secondPart.value
+      : []
   const indices = new Map<number, number>()
   rawEntries.forEach((entry) => {
     const year = typeof entry.date === 'string' ? Number(entry.date) : NaN
-    const indexValue = typeof entry.value === 'number' ? entry.value : NaN
+    const indexValue =
+      typeof entry.value === 'number'
+        ? entry.value
+        : typeof entry.value === 'string'
+          ? Number(entry.value)
+          : NaN
     if (!Number.isInteger(year) || !Number.isFinite(indexValue) || indexValue <= 0) {
       return
     }

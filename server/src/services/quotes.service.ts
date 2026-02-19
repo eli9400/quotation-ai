@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { getFirestoreDb } from '../config/firebase.js'
 import { buildQuoteFromLineItems } from './quote-breakdown.service.js'
+import { rebuildPricingItemsFromDataset } from './pricing-items-dataset-sync.service.js'
 import {
   removeApprovedQuoteFromTrainingDataset,
   syncApprovedQuoteToTrainingDataset,
@@ -193,6 +194,7 @@ export async function updateQuoteForServiceProvider(
   }
   if (updatedRecord.status === 'approved') {
     await syncApprovedQuoteToTrainingDataset(updatedRecord)
+    await rebuildPricingItemsFromDataset(serviceProviderUid)
   }
   return updatedRecord
 }
@@ -217,6 +219,7 @@ export async function approveQuoteForServiceProvider(
     updatedAt: timestamp,
   }
   await syncApprovedQuoteToTrainingDataset(approvedRecord)
+  await rebuildPricingItemsFromDataset(serviceProviderUid)
   return approvedRecord
 }
 export async function deleteQuoteForServiceProvider(
@@ -230,6 +233,7 @@ export async function deleteQuoteForServiceProvider(
   await quoteRef(quoteId).delete()
   if (existing.status === 'approved') {
     await removeApprovedQuoteFromTrainingDataset(serviceProviderUid, quoteId)
+    await rebuildPricingItemsFromDataset(serviceProviderUid)
   }
   return true
 }

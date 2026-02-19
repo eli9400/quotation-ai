@@ -7,7 +7,7 @@ function normalizeNumericText(rawValue: string): string {
   return rawValue
     .replace(/\u00A0/g, ' ')
     .replace(/[₪$€£]/g, ' ')
-    .replace(/[^\d.,'`\-+\s]/g, ' ')
+    .replace(/[^\d.,'`+\s-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -36,14 +36,14 @@ function toDecimalNormalized(value: string): string {
 
   if (hasComma) {
     const pieces = compact.split(',')
-    if (pieces.length === 2 && pieces[1].length <= 2) {
+    if (pieces.length === 2 && (pieces[1].length <= 2 || pieces[1].length === 4)) {
       return `${pieces[0]}.${pieces[1]}`
     }
     return compact.replace(/,/g, '')
   }
 
   const pieces = compact.split('.')
-  if (pieces.length === 2 && pieces[1].length <= 2) {
+  if (pieces.length === 2 && (pieces[1].length <= 2 || pieces[1].length === 4)) {
     return compact
   }
   return compact.replace(/\./g, '')
@@ -76,7 +76,7 @@ export function parseFlexibleNumber(
   }
 
   const sign = normalized.includes('-') ? -1 : 1
-  const unsigned = normalized.replace(/[+\-]/g, '')
+  const unsigned = normalized.replace(/[+-]/g, '')
   const decimalNormalized = toDecimalNormalized(unsigned)
   if (!decimalNormalized || !/\d/.test(decimalNormalized)) {
     return null

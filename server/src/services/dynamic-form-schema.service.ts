@@ -32,7 +32,7 @@ const CLIENT_FIELD_IGNORE_PATTERNS = [
 const TRAILING_UNIT_PATTERN =
   /\s*\((מ["׳']?ר|sqm|m2|יחידות?|unit|points?|נקודות?|days?|ימים?|containers?|מכולות?|קומפלט|package|שעות?|hours?|meters?|מטרים?|%)\)\s*$/i
 const LEADING_UNIT_PATTERN =
-  /^(מ["׳']?ר|sqm|m2|יחידות?|יחידה|unit|נקודות?|נקודה|points?|ימים?|יום|days?|מכולות?|מכולה|containers?|קומפלט|package|שעות?|hours?|מטרים?|meters?)\s*[:\-]?\s+/i
+  /^(מ["׳']?ר|sqm|m2|יחידות?|יחידה|unit|נקודות?|נקודה|points?|ימים?|יום|days?|מכולות?|מכולה|containers?|קומפלט|package|שעות?|hours?|מטרים?|meters?)\s*[:-]?\s+/i
 const UNIT_PRIORITY: Record<PricingUnit, number> = {
   sqm: 1,
   point: 2,

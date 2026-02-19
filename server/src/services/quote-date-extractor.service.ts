@@ -161,6 +161,47 @@ function pickBestDate(candidates: Candidate[]): Date | null {
   return candidates[0].date
 }
 
+function parseFromFileNameYmd(fileName: string): string | null {
+  const match = fileName.match(/(?:^|[^0-9])(20\d{2})[-_.](\d{1,2})[-_.](\d{1,2})(?=$|[^0-9])/)
+  if (!match) {
+    return null
+  }
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  if (!isValidDate(year, month, day)) {
+    return null
+  }
+  return toIsoDate(new Date(Date.UTC(year, month - 1, day)))
+}
+
+function parseFromFileNameDmy(fileName: string): string | null {
+  const match = fileName.match(/(?:^|[^0-9])(\d{1,2})[-_.](\d{1,2})[-_.](20\d{2})(?=$|[^0-9])/)
+  if (!match) {
+    return null
+  }
+  const day = Number(match[1])
+  const month = Number(match[2])
+  const year = Number(match[3])
+  if (!isValidDate(year, month, day)) {
+    return null
+  }
+  return toIsoDate(new Date(Date.UTC(year, month - 1, day)))
+}
+
+function parseFromFileNameYearMonth(fileName: string): string | null {
+  const match = fileName.match(/(?:^|[^0-9])(20\d{2})(0[1-9]|1[0-2])(?=$|[^0-9])/)
+  if (!match) {
+    return null
+  }
+  const year = Number(match[1])
+  const month = Number(match[2])
+  if (!isValidDate(year, month, 1)) {
+    return null
+  }
+  return toIsoDate(new Date(Date.UTC(year, month - 1, 1)))
+}
+
 export function extractQuoteDateFromText(text: string): string | null {
   const source = text.trim()
   if (!source) {
@@ -174,4 +215,16 @@ export function extractQuoteDateFromText(text: string): string | null {
   parsePatternCompact(source, candidates)
   const best = pickBestDate(candidates)
   return best ? toIsoDate(best) : null
+}
+
+export function extractQuoteDateFromFileName(fileName: string): string | null {
+  const source = fileName.trim()
+  if (!source) {
+    return null
+  }
+  return (
+    parseFromFileNameYmd(source) ??
+    parseFromFileNameDmy(source) ??
+    parseFromFileNameYearMonth(source)
+  )
 }

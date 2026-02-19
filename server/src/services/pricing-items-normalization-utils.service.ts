@@ -3,7 +3,7 @@ import type { PricingUnit } from '../types/model-profile.js'
 const TRAILING_BRACKET_UNIT_PATTERN =
   /\s*\((מ["׳³']?ר|sqm|m2|יחיד(?:ה|ות)|unit|points?|נקוד(?:ה|ות)|days?|ימים?|containers?|מכול(?:ה|ות)|קומפלט|package|שעות?|hours?|meters?|מטרים?|%|אחוזים?|percent)\)\s*$/gi
 const LEADING_UNIT_PATTERN =
-  /^(מ["׳³']?ר|sqm|m2|יחיד(?:ה|ות)|unit|נקוד(?:ה|ות)|points?|ימים?|יום|days?|מכול(?:ה|ות)|containers?|קומפלט|package|שעות?|hours?|מטרים?|meters?|אחוזים?|percent)\s*[:\-]?\s+/i
+  /^(מ["׳³']?ר|sqm|m2|יחיד(?:ה|ות)|unit|נקוד(?:ה|ות)|points?|ימים?|יום|days?|מכול(?:ה|ות)|containers?|קומפלט|package|שעות?|hours?|מטרים?|meters?|אחוזים?|percent)\s*[:-]?\s+/i
 const TRAILING_UNIT_WORD_PATTERN =
   /\s+(מ["׳³']?ר|sqm|m2|יחיד(?:ה|ות)|unit|units|נקוד(?:ה|ות)|points?|ימים?|יום|days?|מכול(?:ה|ות)|containers?|קומפלט|package|שעות?|hour|hours|מטרים?|meters?|אחוזים?|percent)\s*$/i
 

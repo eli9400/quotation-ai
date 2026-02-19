@@ -5,7 +5,10 @@ import { PDFParse } from 'pdf-parse'
 import * as XLSX from 'xlsx'
 import { env } from '../config/env.js'
 import { extractDocumentPricingContext } from './document-pricing-context.service.js'
-import { extractQuoteDateFromText } from './quote-date-extractor.service.js'
+import {
+  extractQuoteDateFromFileName,
+  extractQuoteDateFromText,
+} from './quote-date-extractor.service.js'
 import type { DocumentPricingContext } from '../types/pricing-context.js'
 import type { StoredDocument } from '../types/document.js'
 
@@ -16,6 +19,16 @@ export type ExtractedDocumentText = {
   quoteDate: string | null
   pricingContext: DocumentPricingContext
   text: string
+}
+
+type ExtractTextProgress = {
+  processed: number
+  total: number
+  documentId: string
+}
+
+type ExtractTextOptions = {
+  onProgress?: (progress: ExtractTextProgress) => Promise<void> | void
 }
 
 function normalizeText(rawText: string): string {
@@ -142,7 +155,7 @@ export async function extractTextFromStoredDocument(
     documentId: document.id,
     originalName: document.originalName,
     detectedFormat: format,
-    quoteDate: extractQuoteDateFromText(text),
+    quoteDate: extractQuoteDateFromText(text) ?? extractQuoteDateFromFileName(document.originalName),
     pricingContext: extractDocumentPricingContext(text),
     text,
   }
@@ -150,10 +163,19 @@ export async function extractTextFromStoredDocument(
 
 export async function extractTextFromDocuments(
   documents: StoredDocument[],
+  options: ExtractTextOptions = {},
 ): Promise<ExtractedDocumentText[]> {
   const extracted: ExtractedDocumentText[] = []
+  const total = documents.length
+  let processed = 0
   for (const document of documents) {
     extracted.push(await extractTextFromStoredDocument(document))
+    processed += 1
+    await options.onProgress?.({
+      processed,
+      total,
+      documentId: document.id,
+    })
   }
   return extracted
 }

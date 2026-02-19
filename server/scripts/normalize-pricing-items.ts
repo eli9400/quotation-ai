@@ -1,4 +1,4 @@
-﻿import 'dotenv/config'
+import 'dotenv/config'
 import { initializeFirebaseIfConfigured } from '../src/config/firebase.js'
 import { buildDynamicFormSchema } from '../src/services/dynamic-form-schema.service.js'
 import { normalizePricingItemsForServiceProvider } from '../src/services/pricing-items-normalization.service.js'

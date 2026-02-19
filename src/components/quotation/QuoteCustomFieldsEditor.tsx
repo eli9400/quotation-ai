@@ -4,7 +4,7 @@ export type EditableCustomField = {
   id: string
   key: string
   label: string
-  valueType: QuoteCustomField['valueType']
+  valueType: QuoteCustomField['valueType'] | 'percent'
   value: string
   showInQuoteDetails: boolean
 }
@@ -16,19 +16,20 @@ type QuoteCustomFieldsEditorProps = {
   onRemove: (index: number) => void
 }
 
-const FIELD_TYPE_OPTIONS: Array<{ value: QuoteCustomField['valueType']; label: string }> = [
+const FIELD_TYPE_OPTIONS: Array<{
+  value: QuoteCustomField['valueType'] | 'percent'
+  label: string
+}> = [
   { value: 'text', label: 'טקסט' },
   { value: 'number', label: 'מספר' },
+  { value: 'percent', label: 'אחוז מסכום ביניים' },
   { value: 'boolean', label: 'כן/לא' },
 ]
 
-function valuePlaceholder(type: QuoteCustomField['valueType']): string {
-  if (type === 'number') {
-    return '0'
-  }
-  if (type === 'boolean') {
-    return 'true / false'
-  }
+function valuePlaceholder(type: EditableCustomField['valueType']): string {
+  if (type === 'number') return '0'
+  if (type === 'percent') return '9'
+  if (type === 'boolean') return 'true / false'
   return 'ערך'
 }
 
@@ -42,8 +43,7 @@ export function QuoteCustomFieldsEditor({
     <section className="quote-custom-fields">
       <h5>שדות דינמיים להצעה</h5>
       <p className="quote-custom-fields-hint">
-        אפשר להוסיף שדות חופשיים (למשל עודפי מלאי / מספר עובדים) ולבחור אם יוצגו ללקוח בפירוט
-        ההצעה.
+        הוסף שדה פנימי/עסקי. המפתח הטכני נוצר אוטומטית לפי התווית, כך שאין צורך להקליד Key ידנית.
       </p>
 
       {fields.length === 0 ? (
@@ -53,7 +53,6 @@ export function QuoteCustomFieldsEditor({
           <table className="quote-custom-fields-table">
             <thead>
               <tr>
-                <th>מפתח</th>
                 <th>תווית</th>
                 <th>סוג ערך</th>
                 <th>ערך</th>
@@ -66,15 +65,8 @@ export function QuoteCustomFieldsEditor({
                 <tr key={field.id}>
                   <td>
                     <input
-                      value={field.key}
-                      placeholder="inventory_surplus"
-                      onChange={(event) => onChange(index, { key: event.target.value })}
-                    />
-                  </td>
-                  <td>
-                    <input
                       value={field.label}
-                      placeholder="עודפי מלאי"
+                      placeholder="תכנון/ניהול פרויקט"
                       onChange={(event) => onChange(index, { label: event.target.value })}
                     />
                   </td>
@@ -82,7 +74,9 @@ export function QuoteCustomFieldsEditor({
                     <select
                       value={field.valueType}
                       onChange={(event) =>
-                        onChange(index, { valueType: event.target.value as QuoteCustomField['valueType'] })
+                        onChange(index, {
+                          valueType: event.target.value as QuoteCustomField['valueType'] | 'percent',
+                        })
                       }
                     >
                       {FIELD_TYPE_OPTIONS.map((option) => (
@@ -103,9 +97,7 @@ export function QuoteCustomFieldsEditor({
                     <input
                       type="checkbox"
                       checked={field.showInQuoteDetails}
-                      onChange={(event) =>
-                        onChange(index, { showInQuoteDetails: event.target.checked })
-                      }
+                      onChange={(event) => onChange(index, { showInQuoteDetails: event.target.checked })}
                     />
                   </td>
                   <td>

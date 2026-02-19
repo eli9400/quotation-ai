@@ -35,7 +35,13 @@ function parseLineItems(value: unknown): QuoteLineItem[] {
 
       const quantity = Number(item.quantity)
       const unitPrice = Number(item.unitPrice)
-      if (!Number.isFinite(quantity) || !Number.isFinite(unitPrice) || quantity < 0 || unitPrice < 0) {
+      const normalizedUnit = typeof item.unit === 'string' ? item.unit.trim().toLowerCase() : ''
+      const isPercentUnit =
+        normalizedUnit === 'percent' || normalizedUnit === '%' || normalizedUnit === 'pct'
+      if (!Number.isFinite(quantity) || !Number.isFinite(unitPrice)) {
+        return null
+      }
+      if (!isPercentUnit && quantity < 0) {
         return null
       }
 

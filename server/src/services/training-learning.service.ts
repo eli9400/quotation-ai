@@ -21,6 +21,19 @@ type RunTrainingParams = {
   processingDocumentIds?: string[]
 }
 
+function interpolateProgress(
+  start: number,
+  end: number,
+  processed: number,
+  total: number,
+): number {
+  if (total <= 0) {
+    return end
+  }
+  const ratio = Math.min(1, Math.max(0, processed / total))
+  return start + (end - start) * ratio
+}
+
 function asErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message
@@ -35,7 +48,17 @@ export async function runLearningTrainingJob(params: RunTrainingParams): Promise
         ? params.processingDocumentIds
         : params.documentIds
 
-    await setTrainingJobProgress(params.jobId, 12)
+    let lastProgress = 5
+    const reportProgress = async (value: number): Promise<void> => {
+      const clamped = Math.max(0, Math.min(99, Math.round(value)))
+      if (clamped <= lastProgress) {
+        return
+      }
+      lastProgress = clamped
+      await setTrainingJobProgress(params.jobId, clamped)
+    }
+
+    await reportProgress(12)
     const storedDocuments = await getStoredDocumentsByIds(
       params.serviceProviderUid,
       processingDocumentIds,
@@ -44,12 +67,53 @@ export async function runLearningTrainingJob(params: RunTrainingParams): Promise
       throw new Error('Training documents are missing or inaccessible.')
     }
 
-    await setTrainingJobProgress(params.jobId, 34)
-    const extractedDocuments = await extractTextFromDocuments(storedDocuments)
-    await setTrainingJobProgress(params.jobId, 58)
+    await reportProgress(34)
+    let lastExtractLog = 0
+    const extractedDocuments = await extractTextFromDocuments(storedDocuments, {
+      onProgress: async ({ processed, total }) => {
+        await reportProgress(interpolateProgress(34, 58, processed, total))
+        if (
+          processed === total ||
+          processed === 1 ||
+          processed - lastExtractLog >= 10
+        ) {
+          lastExtractLog = processed
+          console.info(`[training] extracting-text ${processed}/${total}`)
+        }
+      },
+    })
+    await reportProgress(58)
 
     const parsed = extractPricingObservations(extractedDocuments)
-    const aiParsed = await extractPricingObservationsWithOpenAi(extractedDocuments).catch(() => null)
+    await reportProgress(64)
+    let lastAiLog = 0
+    let aiParsed: ReturnType<typeof extractPricingObservationsWithOpenAi> extends Promise<infer T>
+      ? T
+      : null = null
+    try {
+      aiParsed = await extractPricingObservationsWithOpenAi(extractedDocuments, {
+        onProgress: async ({ processed, total }) => {
+          await reportProgress(interpolateProgress(64, 76, processed, total))
+          if (
+            processed === total ||
+            processed === 1 ||
+            processed - lastAiLog >= 10
+          ) {
+            lastAiLog = processed
+            console.info(`[training] parsing-pricing-lines ${processed}/${total}`)
+          }
+        },
+      })
+    } catch (error) {
+      console.warn(
+        `[training] OpenAI parser unavailable, using heuristic parser: ${asErrorMessage(error)}`,
+      )
+    }
+    const aiCount = aiParsed?.length ?? 0
+    const source = aiCount > 0 ? 'openai' : 'heuristic'
+    console.info(
+      `[training] extraction summary: docs=${extractedDocuments.length}, heuristicLines=${parsed.observations.length}, aiLines=${aiCount}, source=${source}`,
+    )
     const observationsRaw =
       aiParsed && aiParsed.length > 0 ? aiParsed : parsed.observations
     const normalizedObservations = normalizeObservationsForTraining(observationsRaw)
@@ -62,7 +126,7 @@ export async function runLearningTrainingJob(params: RunTrainingParams): Promise
         'No pricing line-items were detected. Upload clearer quote files or include table-based documents (PDF/XLSX).',
       )
     }
-    await setTrainingJobProgress(params.jobId, 76)
+    await reportProgress(76)
 
     const datasetResult = await rebuildTrainingDatasetFromObservations({
       serviceProviderUid: params.serviceProviderUid,
@@ -72,17 +136,17 @@ export async function runLearningTrainingJob(params: RunTrainingParams): Promise
     console.info(
       `[dataset] rebuilt for ${params.serviceProviderUid}: examples=${datasetResult.totalExamples}, train=${datasetResult.splitCounts.train}, validation=${datasetResult.splitCounts.validation}, test=${datasetResult.splitCounts.test}, items=${datasetResult.uniqueItems}`,
     )
-    await setTrainingJobProgress(params.jobId, 86)
+    await reportProgress(86)
 
     await learnPricingItemsFromObservations(params.serviceProviderUid, observations)
-    await setTrainingJobProgress(params.jobId, 94)
+    await reportProgress(94)
 
     const normalizeResult = await normalizePricingItemsForServiceProvider(params.serviceProviderUid)
     const schema = await buildDynamicFormSchema(params.serviceProviderUid)
     console.info(
       `[training] normalized pricing_items for ${params.serviceProviderUid}: before=${normalizeResult.before}, after=${normalizeResult.after}, removedDuplicates=${normalizeResult.removedDuplicates}, removedNoise=${normalizeResult.removedNoise}, schemaFields=${schema.fields.length}`,
     )
-    await setTrainingJobProgress(params.jobId, 98)
+    await reportProgress(98)
 
     await completeTrainingJob(params.jobId)
   } catch (error) {

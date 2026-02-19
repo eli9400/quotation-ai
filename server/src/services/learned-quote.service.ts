@@ -1,15 +1,23 @@
 import { buildQuoteFromLineItems } from './quote-breakdown.service.js'
 import { resolveCpiAdjustmentForQuote } from './cpi-quote-factor.service.js'
 import { listLearnedPricingItems } from './dynamic-form-schema.service.js'
-import { exactMatchUnitPrice, estimateUnitPriceLinear } from './line-pricing-utils.service.js'
 import { calibrateUnitPricesWithOpenAi } from './openai-line-pricing.service.js'
+import { buildGroundedPricingLines } from './pricing-engine.service.js'
 import { applyCpiFactorToUnitPrice } from './quote-pricing-adjustments.service.js'
-import type { LearnedPricingItem, PricingUnit } from '../types/model-profile.js'
+import type { PricingUnit } from '../types/model-profile.js'
 import type { GeneratedQuote, QuoteClientRequest, QuoteLineItem } from '../types/quote.js'
 
 type GenerateLearnedQuoteInput = {
   serviceProviderUid: string
   request: QuoteClientRequest
+}
+
+type InternalPricedLine = QuoteLineItem & {
+  itemKey: string
+  baseUnitPrice: number
+  pricingMethod: string
+  coverageTier: 'high' | 'medium' | 'low'
+  needsManualReview: boolean
 }
 
 function round2(value: number): number {
@@ -18,15 +26,6 @@ function round2(value: number): number {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
-}
-
-function resolveLabel(item: LearnedPricingItem, fallbackLabel: string): string {
-  const alias = item.aliases?.find((name) => name.trim().length > 0)
-  return (alias ?? fallbackLabel).trim() || item.canonicalName
-}
-
-function toItemKey(item: LearnedPricingItem): string {
-  return `${item.canonicalName}|${item.unit}`
 }
 
 function workloadWeight(unit: PricingUnit): number {
@@ -63,30 +62,50 @@ function estimateDays(lineItems: QuoteLineItem[]): number {
   return Math.max(1, Math.ceil(workUnits / 8))
 }
 
-function estimateConfidence(
-  lineItems: QuoteLineItem[],
-  learnedItemsById: Map<string, LearnedPricingItem>,
-): number {
-  if (lineItems.length === 0) {
+function estimateConfidence(lines: Array<{ coverageTier: 'high' | 'medium' | 'low'; needsManualReview: boolean }>): number {
+  if (lines.length === 0) {
     return 55
   }
 
-  const score = lineItems.reduce((sum, line) => {
-    if (!line.sourceItemId) {
+  const score = lines.reduce((sum, line) => {
+    if (line.needsManualReview) {
       return sum + 0.45
     }
-    const learned = learnedItemsById.get(line.sourceItemId)
-    if (!learned) {
-      return sum + 0.5
+    if (line.coverageTier === 'high') {
+      return sum + 1
     }
-    const inRange =
-      line.quantity >= learned.quantity.min && line.quantity <= learned.quantity.max
-    const sampleScore = Math.min(1, learned.sampleLines / 10)
-    return sum + sampleScore * 0.7 + (inRange ? 0.3 : 0.12)
+    if (line.coverageTier === 'medium') {
+      return sum + 0.76
+    }
+    return sum + 0.56
   }, 0)
 
-  const normalizedScore = score / lineItems.length
-  return Math.round(clamp(52 + normalizedScore * 46, 45, 98))
+  return Math.round(clamp(50 + (score / lines.length) * 46, 42, 98))
+}
+
+function calibrationDeltaForLine(line: InternalPricedLine): number {
+  if (line.needsManualReview) {
+    return 0.05
+  }
+  if (line.coverageTier === 'high') {
+    return 0.15
+  }
+  if (line.coverageTier === 'medium') {
+    return 0.1
+  }
+  return 0.05
+}
+
+function toPersistedLineItems(lines: InternalPricedLine[]): QuoteLineItem[] {
+  return lines.map((line) => ({
+    id: line.id,
+    sourceItemId: line.sourceItemId,
+    description: line.description,
+    unit: line.unit,
+    quantity: line.quantity,
+    unitPrice: line.unitPrice,
+    lineTotal: line.lineTotal,
+  }))
 }
 
 export async function generateLearnedQuote(
@@ -97,62 +116,60 @@ export async function generateLearnedQuote(
     return null
   }
 
-  const learnedById = new Map(learnedItems.map((item) => [item.id, item]))
   const requestedItems = (input.request.requestedItems ?? []).filter(
     (item) => Number.isFinite(item.quantity) && item.quantity > 0,
   )
 
-  const lineItems = requestedItems
-    .map((requested, index) => ({ requested, index }))
-    .map((requested) => {
-      const learned = learnedById.get(requested.requested.sourceItemId)
-      if (!learned) {
-        return null
-      }
+  const grounded = await buildGroundedPricingLines({
+    serviceProviderUid: input.serviceProviderUid,
+    requestedItems,
+    learnedItems,
+  })
 
-      const quantity = round2(requested.requested.quantity)
-      const exactLockedPrice = exactMatchUnitPrice(learned, quantity)
-      const unitPrice = estimateUnitPriceLinear(learned, quantity)
-      return {
-        id: `${requested.requested.sourceItemId}_${Date.now()}_${requested.index}`,
-        sourceItemId: learned.id,
-        itemKey: toItemKey(learned),
-        description: resolveLabel(learned, requested.requested.label),
-        unit: learned.unit,
-        quantity,
-        unitPrice: exactLockedPrice ?? unitPrice,
-        exactLockedPrice,
-        lineTotal: 0,
-      }
-    })
-    .filter((line): line is NonNullable<typeof line> => line !== null)
+  const lineItems: InternalPricedLine[] = grounded.lines.map((line) => ({
+    id: line.id,
+    sourceItemId: line.sourceItemId,
+    description: line.description,
+    unit: line.unit,
+    quantity: line.quantity,
+    unitPrice: line.baseUnitPrice,
+    lineTotal: line.baseLineTotal,
+    itemKey: line.itemKey,
+    baseUnitPrice: line.baseUnitPrice,
+    pricingMethod: line.pricingMethod,
+    coverageTier: line.coverage.tier,
+    needsManualReview: line.needsManualReview,
+  }))
 
   if (lineItems.length === 0) {
     return null
   }
 
-  const lineSamples = new Map(
-    learnedItems.map((item) => [item.id, item.quantityPriceSamples ?? []]),
-  )
   try {
     const calibrated = await calibrateUnitPricesWithOpenAi(
-      lineItems,
-      lineSamples,
+      grounded.lines.map((line) => ({
+        id: line.id,
+        itemKey: line.itemKey,
+        description: line.description,
+        unit: line.unit,
+        quantity: line.quantity,
+        currentUnitPrice: line.baseUnitPrice,
+        pricingMethod: line.pricingMethod,
+        coverageTier: line.coverage.tier,
+        priceStats: line.priceStats,
+        sourceExamples: line.sourceExamples,
+      })),
       input.request.requirements,
     )
     if (calibrated) {
-      const calibrationMaxDelta = 0.08
       lineItems.forEach((line) => {
-        if (line.exactLockedPrice !== null) {
-          line.unitPrice = line.exactLockedPrice
-          return
-        }
         const nextUnitPrice = calibrated.get(line.id)
         if (nextUnitPrice === undefined) {
           return
         }
-        const minAllowed = line.unitPrice * (1 - calibrationMaxDelta)
-        const maxAllowed = line.unitPrice * (1 + calibrationMaxDelta)
+        const delta = calibrationDeltaForLine(line)
+        const minAllowed = line.baseUnitPrice * (1 - delta)
+        const maxAllowed = line.baseUnitPrice * (1 + delta)
         line.unitPrice = round2(clamp(nextUnitPrice, minAllowed, maxAllowed))
       })
     }
@@ -166,6 +183,10 @@ export async function generateLearnedQuote(
     cpiAdjustment = await resolveCpiAdjustmentForQuote({
       serviceProviderUid: input.serviceProviderUid,
       itemKeys: Array.from(new Set(lineItems.map((line) => line.itemKey))),
+      itemQuantities: lineItems.map((line) => ({
+        itemKey: line.itemKey,
+        quantity: line.quantity,
+      })),
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'unknown error'
@@ -179,19 +200,27 @@ export async function generateLearnedQuote(
   }
 
   const estimatedDays = estimateDays(lineItems)
-  const confidence = estimateConfidence(lineItems, learnedById)
+  const confidence = estimateConfidence(
+    lineItems.map((line) => ({
+      coverageTier: line.coverageTier,
+      needsManualReview: line.needsManualReview,
+    })),
+  )
+  const manualReviewCount = lineItems.filter((line) => line.needsManualReview).length
 
   return buildQuoteFromLineItems({
-    lineItems: lineItems.map(({ exactLockedPrice: _ignore, itemKey: _ignore2, ...line }) => line),
+    lineItems: toPersistedLineItems(lineItems),
     pricingAdjustments: { cpi: cpiAdjustment },
     vatRate: 17,
     estimatedDays,
     confidence,
-    summary: `חישוב לפי ${lineItems.length} רכיבים וכמויות שהוזנו בטופס הלקוח.`,
+    summary: `תמחור מבוסס היסטוריה נבנה עבור ${lineItems.length} רכיבי עבודה שביקש הלקוח.`,
     assumptions: [
-      'מחיר יחידה לכל רכיב חושב ליניארית לפי היסטוריית הצעות מחיר.',
-      'ככל שהכמות עולה, מחיר היחידה יורד בטווח שנלמד מנתוני העבר.',
-      'הסכום הסופי כולל מע״מ 17%.',
+      'מחיר הבסיס לכל שורה חושב מנתוני עבר מאומתים של אותו רכיב.',
+      'שיטת החישוב הראשית: חציון לפי טווחי כמות, עם גיבוי אינטרפולציה לינארית בעת צורך.',
+      `מומלץ מעבר ידני עבור ${manualReviewCount} שורות עם כיסוי נתונים נמוך.`,
+      `רכיבים שלא זוהו ולכן לא חושבו: ${grounded.skippedSourceItemIds.length}.`,
+      'מע״מ 17% מחושב על סכום הביניים.',
     ],
   })
 }

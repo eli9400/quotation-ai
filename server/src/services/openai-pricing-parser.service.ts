@@ -19,6 +19,18 @@ type OpenAiPayload = {
 }
 
 const MAX_DOC_TEXT_CHARS = 14_000
+const OPENAI_TIMEOUT_MS = 45_000
+const OPENAI_MAX_ATTEMPTS = 2
+
+type OpenAiParseProgress = {
+  processed: number
+  total: number
+  documentId: string
+}
+
+type OpenAiParseOptions = {
+  onProgress?: (progress: OpenAiParseProgress) => Promise<void> | void
+}
 
 function tryParseJson<T>(value: string): T | null {
   try {
@@ -117,51 +129,78 @@ async function extractForSingleDocument(
     document.text.slice(0, MAX_DOC_TEXT_CHARS),
   ].join('\n')
 
-  const response = await fetch(`${env.openAiBaseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${env.openAiApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: env.openAiModel,
-      response_format: { type: 'json_object' },
-      temperature: 0,
-      messages: [
-        {
-          role: 'system',
-          content: 'You extract structured pricing line-items from contractor quotations.',
+  let lastError: unknown = null
+  for (let attempt = 1; attempt <= OPENAI_MAX_ATTEMPTS; attempt += 1) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS)
+    try {
+      const response = await fetch(`${env.openAiBaseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.openAiApiKey}`,
+          'Content-Type': 'application/json',
         },
-        { role: 'user', content: prompt },
-      ],
-    }),
-  })
+        body: JSON.stringify({
+          model: env.openAiModel,
+          response_format: { type: 'json_object' },
+          temperature: 0,
+          messages: [
+            {
+              role: 'system',
+              content: 'You extract structured pricing line-items from contractor quotations.',
+            },
+            { role: 'user', content: prompt },
+          ],
+        }),
+        signal: controller.signal,
+      })
 
-  if (!response.ok) {
-    throw new Error(`OpenAI pricing parser failed with status ${response.status}`)
+      if (!response.ok) {
+        throw new Error(`OpenAI pricing parser failed with status ${response.status}`)
+      }
+
+      const payload = (await response.json()) as OpenAiPayload
+      const content = payload.choices?.[0]?.message?.content ?? ''
+      const parsed = tryParseJson<{ items?: OpenAiRawItem[] }>(content)
+      const items = Array.isArray(parsed?.items) ? parsed.items : []
+      return items
+        .map((item) => toObservation(document.documentId, document, item))
+        .filter((item): item is PricingObservation => item !== null)
+    } catch (error) {
+      lastError = error
+      if (attempt < OPENAI_MAX_ATTEMPTS) {
+        continue
+      }
+    } finally {
+      clearTimeout(timeout)
+    }
   }
 
-  const payload = (await response.json()) as OpenAiPayload
-  const content = payload.choices?.[0]?.message?.content ?? ''
-  const parsed = tryParseJson<{ items?: OpenAiRawItem[] }>(content)
-  const items = Array.isArray(parsed?.items) ? parsed.items : []
-
-  return items
-    .map((item) => toObservation(document.documentId, document, item))
-    .filter((item): item is PricingObservation => item !== null)
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('OpenAI pricing parser failed without a detailed error.')
 }
 
 export async function extractPricingObservationsWithOpenAi(
   documents: ExtractedDocumentText[],
+  options: OpenAiParseOptions = {},
 ): Promise<PricingObservation[] | null> {
   if (!env.openAiApiKey || documents.length === 0) {
     return null
   }
 
   const observations: PricingObservation[] = []
+  const total = documents.length
+  let processed = 0
   for (const document of documents) {
     const extracted = await extractForSingleDocument(document)
     observations.push(...extracted)
+    processed += 1
+    await options.onProgress?.({
+      processed,
+      total,
+      documentId: document.documentId,
+    })
   }
   return observations
 }

@@ -1,7 +1,35 @@
 import type { PricingObservation } from '../types/pricing-observation.js'
+import type { PricingUnit } from '../types/model-profile.js'
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100
+}
+
+function maxUnitPriceByUnit(unit: PricingUnit): number {
+  switch (unit) {
+    case 'sqm':
+      return 2_000
+    case 'point':
+      return 5_000
+    case 'day':
+      return 8_000
+    case 'container':
+      return 30_000
+    case 'package':
+      return 500_000
+    case 'unit':
+      return 50_000
+    case 'meter':
+      return 5_000
+    case 'hour':
+      return 1_000
+    case 'fixed':
+      return 500_000
+    case 'percent':
+      return 100
+    default:
+      return 50_000
+  }
 }
 
 function clampDiscount(value: number | null): number | null {
@@ -54,7 +82,16 @@ function keepPositiveObservation(observation: PricingObservation): PricingObserv
   if (observation.pricePerUnit <= 0 || observation.lineTotal <= 0 || observation.quantity <= 0) {
     return null
   }
+  if (observation.quantity > 100_000) {
+    return null
+  }
+  if (observation.pricePerUnit > maxUnitPriceByUnit(observation.unit)) {
+    return null
+  }
   const lineTotal = round2(observation.pricePerUnit * observation.quantity)
+  if (lineTotal > 20_000_000) {
+    return null
+  }
   return {
     ...observation,
     lineTotal,

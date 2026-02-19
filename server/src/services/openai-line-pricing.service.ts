@@ -1,13 +1,21 @@
 import { env } from '../config/env.js'
-import type { QuoteLineItem } from '../types/quote.js'
 
-type CalibrationLine = {
+export type OpenAiLineCalibrationInput = {
   id: string
+  itemKey: string
   description: string
   unit: string
   quantity: number
   currentUnitPrice: number
-  samplePairs: Array<{ quantity: number; unitPrice: number }>
+  pricingMethod: string
+  coverageTier: 'high' | 'medium' | 'low'
+  priceStats: {
+    min: number
+    median: number
+    avg: number
+    max: number
+  }
+  sourceExamples: Array<{ quantity: number; unitPrice: number }>
 }
 
 type OpenAiRawItem = {
@@ -44,36 +52,27 @@ function toNumber(value: unknown): number | null {
   return null
 }
 
-function buildPrompt(lines: CalibrationLine[], requirements: string): string {
+function buildPrompt(lines: OpenAiLineCalibrationInput[], requirements: string): string {
   return [
-    'Adjust unit prices for quote line-items.',
-    'Important:',
-    '- If quantity exactly matches past samples, use almost the same unit price.',
-    '- For larger quantities, unit price should not increase.',
-    '- Return only JSON: {"items":[{"id":"...","unitPrice":123.45}]}',
-    '- Do not add extra fields.',
+    'Adjust unit prices for line-items using the provided grounded context only.',
+    'Rules:',
+    '- Never ignore currentUnitPrice; it is the grounded base price from historical data.',
+    '- Prefer no change when coverageTier is low.',
+    '- For larger quantities, avoid increasing unit price unless strongly justified by context.',
+    '- Output strict JSON only: {"items":[{"id":"...","unitPrice":123.45}]}',
+    '- Do not include any extra keys.',
     `Client requirements: ${requirements || 'none'}`,
-    `Lines: ${JSON.stringify(lines)}`,
+    `Grounded lines: ${JSON.stringify(lines)}`,
   ].join('\n')
 }
 
 export async function calibrateUnitPricesWithOpenAi(
-  lineItems: QuoteLineItem[],
-  lineSamples: Map<string, Array<{ quantity: number; unitPrice: number }>>,
+  lines: OpenAiLineCalibrationInput[],
   requirements: string,
 ): Promise<Map<string, number> | null> {
-  if (!env.openAiApiKey || lineItems.length === 0) {
+  if (!env.openAiApiKey || lines.length === 0) {
     return null
   }
-
-  const lines: CalibrationLine[] = lineItems.map((line) => ({
-    id: line.id,
-    description: line.description,
-    unit: line.unit,
-    quantity: line.quantity,
-    currentUnitPrice: line.unitPrice,
-    samplePairs: line.sourceItemId ? (lineSamples.get(line.sourceItemId) ?? []).slice(0, 18) : [],
-  }))
 
   const response = await fetch(`${env.openAiBaseUrl}/chat/completions`, {
     method: 'POST',
@@ -88,7 +87,7 @@ export async function calibrateUnitPricesWithOpenAi(
       messages: [
         {
           role: 'system',
-          content: 'You are a pricing model that returns strict JSON only.',
+          content: 'You are a pricing calibration assistant and must return JSON only.',
         },
         {
           role: 'user',

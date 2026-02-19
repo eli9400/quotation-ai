@@ -33,7 +33,8 @@ function mapMulterErrorMessage(error: multer.MulterError): string {
   return error.message
 }
 
-app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+app.use((error: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  void next
   if (error instanceof multer.MulterError) {
     res.status(400).json({ ok: false, message: mapMulterErrorMessage(error) })
     return
