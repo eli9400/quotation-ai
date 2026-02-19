@@ -18,5 +18,5 @@ export const allowedMimeTypes = new Set([
 ])
 
 export const uploadLimits = {
-  maxFiles: 20,
+  maxFiles: 500,
 }

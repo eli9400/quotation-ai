@@ -7,6 +7,10 @@ import { PrimaryButton } from '../ui/PrimaryButton'
 
 type ClientStage = 'lookup' | 'form' | 'submitted'
 
+function isClientVisibleField(field: FormPreviewSchema['fields'][number]): boolean {
+  return !field.visibleTo || field.visibleTo === 'client'
+}
+
 function initialFieldValue(field: FormPreviewSchema['fields'][number]): string {
   return field.type === 'number' ? '0' : ''
 }
@@ -17,7 +21,7 @@ function createInitialFormValues(
   clientEmail: string,
 ): Record<string, string> {
   const values: Record<string, string> = {}
-  schema.fields.forEach((field) => {
+  schema.fields.filter(isClientVisibleField).forEach((field) => {
     values[field.id] = initialFieldValue(field)
   })
   values.clientName = clientName
@@ -134,7 +138,10 @@ export function ClientAccessPanel() {
   }
 
   if (stage === 'form' && schema && serviceProvider) {
-    const orderedFields = schema.fields.slice().sort((a, b) => a.order - b.order)
+    const orderedFields = schema.fields
+      .filter(isClientVisibleField)
+      .slice()
+      .sort((a, b) => a.order - b.order)
 
     return (
       <>

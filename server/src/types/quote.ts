@@ -1,4 +1,5 @@
 import type { PricingUnit } from './model-profile.js'
+import type { CustomFeatureValueType } from './custom-feature.js'
 
 export type ProjectType = 'renovation' | 'consulting' | 'installation' | 'maintenance'
 
@@ -32,8 +33,30 @@ export type QuoteLineItem = {
   lineTotal: number
 }
 
+export type QuoteCustomField = {
+  id: string
+  key: string
+  label: string
+  valueType: CustomFeatureValueType
+  value: string | number | boolean | null
+  showInQuoteDetails: boolean
+}
+
+export type QuoteCpiAdjustment = {
+  enabled: boolean
+  factor: number
+  sourceYear: number | null
+  targetYear: number | null
+}
+
+export type QuotePricingAdjustments = {
+  cpi: QuoteCpiAdjustment | null
+}
+
 export type GeneratedQuote = {
   lineItems: QuoteLineItem[]
+  customFields: QuoteCustomField[]
+  pricingAdjustments: QuotePricingAdjustments
   subtotalBeforeVat: number
   vatRate: number
   vatAmount: number

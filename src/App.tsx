@@ -6,6 +6,7 @@ import { QuotesHistoryPanel } from './components/quotation/QuotesHistoryPanel'
 import { TrainingPanel } from './components/quotation/TrainingPanel'
 import { HeroSection } from './components/sections/HeroSection'
 import { StepsSection } from './components/sections/StepsSection'
+import { ToastMessage } from './components/ui/ToastMessage'
 import { useClientFormPreview } from './hooks/useClientFormPreview'
 import { useQuotationMvp } from './hooks/useQuotationMvp'
 import { useServiceProviderAuth } from './hooks/useServiceProviderAuth'
@@ -109,7 +110,7 @@ function App() {
           </section>
 
           {formPreview.errorMessage ? <p className="error-banner">{formPreview.errorMessage}</p> : null}
-          {errorMessage ? <p className="error-banner">{errorMessage}</p> : null}
+          <ToastMessage message={errorMessage} tone="error" />
         </>
       )}
     </main>

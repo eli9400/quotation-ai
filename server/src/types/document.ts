@@ -5,5 +5,6 @@ export type StoredDocument = {
   storedName: string
   mimeType: string
   size: number
+  fileHash: string
   uploadedAt: string
 }

@@ -22,6 +22,15 @@ type ParsePublicClientRequestResult =
 
 type FormValues = Record<string, unknown>
 
+function isClientVisibleField(field: DynamicFormSchema['fields'][number]): boolean {
+  return !field.visibleTo || field.visibleTo === 'client'
+}
+
+function isQuantityInputField(field: DynamicFormSchema['fields'][number]): boolean {
+  const role = field.role ?? 'input_qty'
+  return isClientVisibleField(field) && role === 'input_qty' && field.sourceItemId !== null && field.type === 'number'
+}
+
 function isEnumValue<T extends string>(value: unknown, accepted: readonly T[]): value is T {
   return typeof value === 'string' && accepted.includes(value as T)
 }
@@ -52,7 +61,7 @@ function toNumberValue(value: unknown): number | null {
 }
 
 function validateRequiredFields(schema: DynamicFormSchema, formValues: FormValues): string | null {
-  for (const field of schema.fields) {
+  for (const field of schema.fields.filter(isClientVisibleField)) {
     if (!field.required) {
       continue
     }
@@ -84,7 +93,7 @@ function buildRequestedItems(
   formValues: FormValues,
 ): QuoteRequestedItem[] {
   return schema.fields
-    .filter((field) => field.sourceItemId !== null && field.type === 'number')
+    .filter(isQuantityInputField)
     .map((field) => {
       const quantity = toNumberValue(formValues[field.id]) ?? 0
       return {

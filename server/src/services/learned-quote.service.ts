@@ -1,7 +1,9 @@
 import { buildQuoteFromLineItems } from './quote-breakdown.service.js'
+import { resolveCpiAdjustmentForQuote } from './cpi-quote-factor.service.js'
 import { listLearnedPricingItems } from './dynamic-form-schema.service.js'
 import { exactMatchUnitPrice, estimateUnitPriceLinear } from './line-pricing-utils.service.js'
 import { calibrateUnitPricesWithOpenAi } from './openai-line-pricing.service.js'
+import { applyCpiFactorToUnitPrice } from './quote-pricing-adjustments.service.js'
 import type { LearnedPricingItem, PricingUnit } from '../types/model-profile.js'
 import type { GeneratedQuote, QuoteClientRequest, QuoteLineItem } from '../types/quote.js'
 
@@ -23,10 +25,22 @@ function resolveLabel(item: LearnedPricingItem, fallbackLabel: string): string {
   return (alias ?? fallbackLabel).trim() || item.canonicalName
 }
 
+function toItemKey(item: LearnedPricingItem): string {
+  return `${item.canonicalName}|${item.unit}`
+}
+
 function workloadWeight(unit: PricingUnit): number {
   switch (unit) {
     case 'sqm':
       return 0.045
+    case 'point':
+      return 0.2
+    case 'day':
+      return 1
+    case 'container':
+      return 0.4
+    case 'package':
+      return 0.6
     case 'meter':
       return 0.04
     case 'unit':
@@ -102,6 +116,7 @@ export async function generateLearnedQuote(
       return {
         id: `${requested.requested.sourceItemId}_${Date.now()}_${requested.index}`,
         sourceItemId: learned.id,
+        itemKey: toItemKey(learned),
         description: resolveLabel(learned, requested.requested.label),
         unit: learned.unit,
         quantity,
@@ -146,11 +161,29 @@ export async function generateLearnedQuote(
     console.warn(`[learned-quote] OpenAI calibration skipped: ${message}`)
   }
 
+  let cpiAdjustment: GeneratedQuote['pricingAdjustments']['cpi'] = null
+  try {
+    cpiAdjustment = await resolveCpiAdjustmentForQuote({
+      serviceProviderUid: input.serviceProviderUid,
+      itemKeys: Array.from(new Set(lineItems.map((line) => line.itemKey))),
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'unknown error'
+    console.warn(`[learned-quote] CPI factor resolution skipped: ${message}`)
+  }
+
+  if (cpiAdjustment?.enabled) {
+    lineItems.forEach((line) => {
+      line.unitPrice = applyCpiFactorToUnitPrice(line.unitPrice, cpiAdjustment)
+    })
+  }
+
   const estimatedDays = estimateDays(lineItems)
   const confidence = estimateConfidence(lineItems, learnedById)
 
   return buildQuoteFromLineItems({
-    lineItems: lineItems.map(({ exactLockedPrice: _ignore, ...line }) => line),
+    lineItems: lineItems.map(({ exactLockedPrice: _ignore, itemKey: _ignore2, ...line }) => line),
+    pricingAdjustments: { cpi: cpiAdjustment },
     vatRate: 17,
     estimatedDays,
     confidence,

@@ -1,7 +1,7 @@
-import { unlink } from 'node:fs/promises'
 import path from 'node:path'
 import { env } from '../config/env.js'
 import { getFirestoreDb } from '../config/firebase.js'
+import { calculateFileHashFromPath, deleteFileIfExists } from './document-hash.service.js'
 import type { StoredDocument } from '../types/document.js'
 
 const DOCUMENTS_COLLECTION = 'documents'
@@ -10,10 +10,13 @@ type RawStoredDocument = StoredDocument & {
   contractorUid?: string
 }
 
-function normalizeStoredDocument(
-  docId: string,
-  raw: RawStoredDocument,
-): StoredDocument | null {
+export type DuplicateDocumentGroup = {
+  fileHash: string
+  documentIds: string[]
+  originalNames: string[]
+}
+
+function normalizeStoredDocument(docId: string, raw: RawStoredDocument): StoredDocument | null {
   const serviceProviderUid = raw.serviceProviderUid ?? raw.contractorUid
   if (!serviceProviderUid) {
     return null
@@ -26,7 +29,34 @@ function normalizeStoredDocument(
     storedName: raw.storedName,
     mimeType: raw.mimeType,
     size: raw.size,
+    fileHash: raw.fileHash ?? '',
     uploadedAt: raw.uploadedAt,
+  }
+}
+
+function resolveStoredFilePath(storedName: string): string {
+  return path.join(env.uploadsDir, path.basename(storedName))
+}
+
+async function persistFileHash(documentId: string, fileHash: string): Promise<void> {
+  const db = getFirestoreDb()
+  await db.collection(DOCUMENTS_COLLECTION).doc(documentId).set({ fileHash }, { merge: true })
+}
+
+async function ensureDocumentHash(document: StoredDocument): Promise<StoredDocument> {
+  if (document.fileHash.trim().length > 0) {
+    return document
+  }
+
+  try {
+    const fileHash = await calculateFileHashFromPath(resolveStoredFilePath(document.storedName))
+    await persistFileHash(document.id, fileHash)
+    return {
+      ...document,
+      fileHash,
+    }
+  } catch {
+    return document
   }
 }
 
@@ -55,10 +85,7 @@ export async function saveUploadedDocuments(
 
 async function listDocumentIdsByField(fieldName: string, uid: string): Promise<string[]> {
   const db = getFirestoreDb()
-  const snapshot = await db
-    .collection(DOCUMENTS_COLLECTION)
-    .where(fieldName, '==', uid)
-    .get()
+  const snapshot = await db.collection(DOCUMENTS_COLLECTION).where(fieldName, '==', uid).get()
   return snapshot.docs.map((doc) => doc.id)
 }
 
@@ -78,7 +105,6 @@ export async function resolveTrainingDocumentIds(
   if (availableIds.length === 0) {
     return []
   }
-
   if (!requestedIds || requestedIds.length === 0) {
     return availableIds
   }
@@ -87,9 +113,7 @@ export async function resolveTrainingDocumentIds(
   return requestedIds.filter((id) => availableSet.has(id))
 }
 
-export async function listStoredDocuments(
-  serviceProviderUid: string,
-): Promise<StoredDocument[]> {
+export async function listStoredDocuments(serviceProviderUid: string): Promise<StoredDocument[]> {
   const availableIds = await listStoredDocumentIds(serviceProviderUid)
   return getStoredDocumentsByIds(serviceProviderUid, availableIds)
 }
@@ -98,9 +122,7 @@ export async function getStoredDocumentsByIds(
   serviceProviderUid: string,
   documentIds: string[],
 ): Promise<StoredDocument[]> {
-  const uniqueIds = Array.from(
-    new Set(documentIds.map((id) => id.trim()).filter((id) => id.length > 0)),
-  )
+  const uniqueIds = Array.from(new Set(documentIds.map((id) => id.trim()).filter(Boolean)))
   if (uniqueIds.length === 0) {
     return []
   }
@@ -110,27 +132,20 @@ export async function getStoredDocumentsByIds(
     uniqueIds.map((id) => db.collection(DOCUMENTS_COLLECTION).doc(id).get()),
   )
 
-  return snapshots
+  const normalized = snapshots
     .map((snapshot) => {
       if (!snapshot.exists) {
         return null
       }
-
-      const normalized = normalizeStoredDocument(
-        snapshot.id,
-        snapshot.data() as RawStoredDocument,
-      )
-      if (!normalized) {
+      const document = normalizeStoredDocument(snapshot.id, snapshot.data() as RawStoredDocument)
+      if (!document || document.serviceProviderUid !== serviceProviderUid) {
         return null
       }
-
-      if (normalized.serviceProviderUid !== serviceProviderUid) {
-        return null
-      }
-
-      return normalized
+      return document
     })
     .filter((item): item is StoredDocument => item !== null)
+
+  return Promise.all(normalized.map((document) => ensureDocumentHash(document)))
 }
 
 export async function getStoredDocumentById(
@@ -142,21 +157,7 @@ export async function getStoredDocumentById(
 }
 
 async function removeStoredFile(storedName: string): Promise<void> {
-  const safeFileName = path.basename(storedName)
-  const filePath = path.join(env.uploadsDir, safeFileName)
-  try {
-    await unlink(filePath)
-  } catch (error) {
-    if (
-      error &&
-      typeof error === 'object' &&
-      'code' in error &&
-      error.code === 'ENOENT'
-    ) {
-      return
-    }
-    throw error
-  }
+  await deleteFileIfExists(resolveStoredFilePath(storedName))
 }
 
 export async function deleteStoredDocument(
@@ -172,4 +173,29 @@ export async function deleteStoredDocument(
   const db = getFirestoreDb()
   await db.collection(DOCUMENTS_COLLECTION).doc(documentId).delete()
   return true
+}
+
+export async function findDuplicateDocumentsByHash(
+  serviceProviderUid: string,
+  documentIds: string[],
+): Promise<DuplicateDocumentGroup[]> {
+  const documents = await getStoredDocumentsByIds(serviceProviderUid, documentIds)
+  const groupedByHash = new Map<string, StoredDocument[]>()
+
+  documents.forEach((document) => {
+    if (!document.fileHash) {
+      return
+    }
+    const current = groupedByHash.get(document.fileHash) ?? []
+    current.push(document)
+    groupedByHash.set(document.fileHash, current)
+  })
+
+  return Array.from(groupedByHash.entries())
+    .filter(([, docs]) => docs.length > 1)
+    .map(([fileHash, docs]) => ({
+      fileHash,
+      documentIds: docs.map((doc) => doc.id),
+      originalNames: docs.map((doc) => doc.originalName),
+    }))
 }

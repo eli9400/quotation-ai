@@ -23,9 +23,19 @@ app.use('/api', modelRouter)
 app.use('/api', quotesRouter)
 app.use('/api', providerQuotesRouter)
 
+function mapMulterErrorMessage(error: multer.MulterError): string {
+  if (error.code === 'LIMIT_FILE_COUNT') {
+    return 'Too many files in one upload request. Split into smaller batches.'
+  }
+  if (error.code === 'LIMIT_FILE_SIZE') {
+    return 'One or more files exceed the allowed size limit.'
+  }
+  return error.message
+}
+
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   if (error instanceof multer.MulterError) {
-    res.status(400).json({ ok: false, message: error.message })
+    res.status(400).json({ ok: false, message: mapMulterErrorMessage(error) })
     return
   }
   if (error instanceof Error) {

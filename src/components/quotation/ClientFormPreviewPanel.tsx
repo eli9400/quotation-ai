@@ -6,6 +6,10 @@ type ClientFormPreviewPanelProps = {
   isLoading: boolean
 }
 
+function isClientVisibleField(field: FormPreviewSchema['fields'][number]): boolean {
+  return !field.visibleTo || field.visibleTo === 'client'
+}
+
 function renderPreviewControl(field: FormPreviewSchema['fields'][number]) {
   if (field.type === 'textarea') {
     return <textarea disabled rows={3} placeholder={field.placeholder ?? ''} />
@@ -38,7 +42,7 @@ function schemaDescription(schema: FormPreviewSchema | null): string {
     return 'התצוגה תופיע אחרי אימון ראשון או כשיש מודל שמור.'
   }
 
-  const dynamicCount = schema.fields.filter((field) => field.sourceItemId !== null).length
+  const dynamicCount = schema.fields.filter((field) => isClientVisibleField(field) && field.sourceItemId !== null).length
   const generatedAt = new Date(schema.generatedAt).toLocaleString('he-IL')
   return `השדות נבנו לפי האימון האחרון. שדות דינמיים: ${dynamicCount}. עדכון: ${generatedAt}.`
 }
@@ -48,11 +52,12 @@ export function ClientFormPreviewPanel({ schema, isLoading }: ClientFormPreviewP
     <Panel title="תצוגת טופס ללקוח" description={schemaDescription(schema)}>
       {isLoading ? (
         <p className="empty">טוען תצוגת טופס...</p>
-      ) : !schema || schema.fields.length === 0 ? (
+      ) : !schema || schema.fields.filter(isClientVisibleField).length === 0 ? (
         <p className="empty">לא נמצא מודל שמור. העלו מסמכים והריצו אימון.</p>
       ) : (
         <form className="preview-form">
           {schema.fields
+            .filter(isClientVisibleField)
             .slice()
             .sort((a, b) => a.order - b.order)
             .map((field) => (

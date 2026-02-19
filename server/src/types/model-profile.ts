@@ -1,9 +1,14 @@
 export type PricingUnit =
   | 'sqm'
   | 'unit'
+  | 'point'
+  | 'day'
+  | 'container'
+  | 'package'
   | 'hour'
   | 'meter'
   | 'fixed'
+  | 'percent'
   | 'unknown'
 
 export type NumericRange = {
@@ -31,11 +36,17 @@ export type LearnedPricingItem = {
 }
 
 export type DynamicFieldType = 'number' | 'text' | 'select' | 'textarea'
+export type FormFieldVisibility = 'client' | 'provider' | 'internal'
+export type FormFieldEditor = 'client' | 'provider' | 'internal'
+export type FormFieldRole = 'input_qty' | 'contact' | 'requirements' | 'internal_meta'
 
 export type DynamicFormField = {
   id: string
   label: string
   type: DynamicFieldType
+  role: FormFieldRole
+  visibleTo: FormFieldVisibility
+  editableBy: FormFieldEditor
   required: boolean
   order: number
   sourceItemId: string | null

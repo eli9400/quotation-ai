@@ -129,20 +129,17 @@ function upsertItem(
   }
 }
 
-async function deleteAllExistingPricingItems(serviceProviderUid: string): Promise<void> {
+async function listExistingPricingItems(
+  serviceProviderUid: string,
+): Promise<Map<string, LearnedPricingItem>> {
   const db = getFirestoreDb()
   const snapshot = await db
     .collection(PRICING_ITEMS_COLLECTION)
     .where('serviceProviderUid', '==', serviceProviderUid)
     .get()
 
-  if (snapshot.empty) {
-    return
-  }
-
-  const batch = db.batch()
-  snapshot.docs.forEach((doc) => batch.delete(doc.ref))
-  await batch.commit()
+  const items = snapshot.docs.map((doc) => doc.data() as LearnedPricingItem)
+  return new Map(items.map((item) => [buildKey(item), item]))
 }
 
 async function persistItems(items: LearnedPricingItem[]): Promise<void> {
@@ -164,7 +161,15 @@ export async function learnPricingItemsFromObservations(
   observations: PricingObservation[],
 ): Promise<LearnResult> {
   const filtered = observations.filter(shouldKeepPricingObservation)
-  const aggregated = new Map<string, LearnedPricingItem>()
+  if (filtered.length === 0) {
+    return {
+      learnedItems: 0,
+      processedObservations: filtered.length,
+    }
+  }
+
+  const existingByKey = await listExistingPricingItems(serviceProviderUid)
+  const aggregated = new Map(existingByKey)
 
   filtered.forEach((observation) => {
     const key = buildKey(observation)
@@ -172,7 +177,6 @@ export async function learnPricingItemsFromObservations(
     aggregated.set(key, upsertItem(serviceProviderUid, existing, observation))
   })
 
-  await deleteAllExistingPricingItems(serviceProviderUid)
   await persistItems(Array.from(aggregated.values()))
 
   return {

@@ -14,6 +14,8 @@ export type UploadedDocument = {
 
 export type Quote = {
   lineItems: QuoteLineItem[]
+  customFields: QuoteCustomField[]
+  pricingAdjustments: QuotePricingAdjustments
   subtotalBeforeVat: number
   vatRate: number
   vatAmount: number
@@ -33,6 +35,26 @@ export type QuoteLineItem = {
   quantity: number
   unitPrice: number
   lineTotal: number
+}
+
+export type QuoteCustomField = {
+  id: string
+  key: string
+  label: string
+  valueType: 'number' | 'text' | 'boolean'
+  value: string | number | boolean | null
+  showInQuoteDetails: boolean
+}
+
+export type QuoteCpiAdjustment = {
+  enabled: boolean
+  factor: number
+  sourceYear: number | null
+  targetYear: number | null
+}
+
+export type QuotePricingAdjustments = {
+  cpi: QuoteCpiAdjustment | null
 }
 
 export type ClientRequestForm = {
@@ -81,6 +103,9 @@ export type FormPreviewField = {
   id: string
   label: string
   type: 'number' | 'text' | 'select' | 'textarea'
+  role: 'input_qty' | 'contact' | 'requirements' | 'internal_meta'
+  visibleTo: 'client' | 'provider' | 'internal'
+  editableBy: 'client' | 'provider' | 'internal'
   required: boolean
   order: number
   sourceItemId: string | null

@@ -38,14 +38,17 @@ export function QuotesHistoryPanel({ authToken, records, isLoading }: QuotesHist
 
   useEffect(() => {
     setLocalRecords(records)
+  }, [records])
+
+  useEffect(() => {
     if (!selectedId) {
       return
     }
-    const exists = records.some((record) => record.id === selectedId)
+    const exists = localRecords.some((record) => record.id === selectedId)
     if (!exists) {
       setSelectedId(null)
     }
-  }, [records, selectedId])
+  }, [localRecords, selectedId])
 
   const selectedRecord = useMemo(
     () => localRecords.find((record) => record.id === selectedId) ?? null,

@@ -6,6 +6,7 @@ export const env = {
   port: Number(process.env.PORT ?? 4000),
   webOrigin: process.env.WEB_ORIGIN ?? 'http://localhost:5173',
   maxUploadSizeMb: Number(process.env.UPLOADS_MAX_MB ?? 10),
+  clientFormMaxItems: Number(process.env.CLIENT_FORM_MAX_ITEMS ?? 40),
   uploadsDir: process.env.UPLOADS_DIR ?? defaultUploadsDir,
   firebaseServiceAccountPath: process.env.FIREBASE_SERVICE_ACCOUNT_PATH ?? '',
   firebaseProjectId: process.env.FIREBASE_PROJECT_ID ?? '',

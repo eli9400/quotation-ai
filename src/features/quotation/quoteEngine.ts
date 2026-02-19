@@ -57,6 +57,8 @@ export function generateQuote({ request, documentCount }: QuoteInput): Quote {
         lineTotal: estimatedPrice,
       },
     ],
+    customFields: [],
+    pricingAdjustments: { cpi: null },
     subtotalBeforeVat: estimatedPrice,
     vatRate: 0,
     vatAmount: 0,

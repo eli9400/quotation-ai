@@ -29,6 +29,46 @@ function normalizeLineItems(quote: Quote) {
     }))
 }
 
+function normalizeCustomFields(quote: Quote) {
+  if (!Array.isArray(quote?.customFields)) {
+    return []
+  }
+
+  return quote.customFields
+    .filter((item) => item && typeof item.key === 'string')
+    .map((item) => {
+      const valueType: 'number' | 'text' | 'boolean' =
+        item.valueType === 'number' || item.valueType === 'boolean' ? item.valueType : 'text'
+      return {
+        id: item.id ?? crypto.randomUUID(),
+        key: item.key.trim().toLowerCase(),
+        label: typeof item.label === 'string' && item.label.trim() ? item.label.trim() : item.key,
+        valueType,
+        value: item.value ?? null,
+        showInQuoteDetails: Boolean(item.showInQuoteDetails),
+      }
+    })
+}
+
+function normalizePricingAdjustments(quote: Quote) {
+  const rawCpi = quote?.pricingAdjustments?.cpi
+  if (!rawCpi || typeof rawCpi !== 'object') {
+    return { cpi: null }
+  }
+
+  const factor = Number(rawCpi.factor)
+  const sourceYear = Number(rawCpi.sourceYear)
+  const targetYear = Number(rawCpi.targetYear)
+  return {
+    cpi: {
+      enabled: Boolean(rawCpi.enabled),
+      factor: Number.isFinite(factor) && factor > 0 ? factor : 1,
+      sourceYear: Number.isInteger(sourceYear) ? sourceYear : null,
+      targetYear: Number.isInteger(targetYear) ? targetYear : null,
+    },
+  }
+}
+
 export function mapQuoteRecordPayload(payload: QuoteRecordPayload): StoredQuoteRecord {
   const clientRequest: ClientRequestForm = {
     clientName: payload.clientRequest?.clientName ?? '',
@@ -43,6 +83,8 @@ export function mapQuoteRecordPayload(payload: QuoteRecordPayload): StoredQuoteR
   }
 
   const lineItems = normalizeLineItems(payload.quote)
+  const customFields = normalizeCustomFields(payload.quote)
+  const pricingAdjustments = normalizePricingAdjustments(payload.quote)
   const subtotalBeforeVat =
     Number(payload.quote?.subtotalBeforeVat) ||
     lineItems.reduce((sum, item) => sum + item.lineTotal, 0)
@@ -68,6 +110,8 @@ export function mapQuoteRecordPayload(payload: QuoteRecordPayload): StoredQuoteR
     quote: {
       ...payload.quote,
       lineItems,
+      customFields,
+      pricingAdjustments,
       subtotalBeforeVat,
       vatRate: safeVatRate,
       vatAmount,

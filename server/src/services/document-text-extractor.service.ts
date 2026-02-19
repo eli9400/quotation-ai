@@ -4,12 +4,17 @@ import mammoth from 'mammoth'
 import { PDFParse } from 'pdf-parse'
 import * as XLSX from 'xlsx'
 import { env } from '../config/env.js'
+import { extractDocumentPricingContext } from './document-pricing-context.service.js'
+import { extractQuoteDateFromText } from './quote-date-extractor.service.js'
+import type { DocumentPricingContext } from '../types/pricing-context.js'
 import type { StoredDocument } from '../types/document.js'
 
 export type ExtractedDocumentText = {
   documentId: string
   originalName: string
   detectedFormat: 'pdf' | 'docx' | 'xls' | 'xlsx' | 'csv'
+  quoteDate: string | null
+  pricingContext: DocumentPricingContext
   text: string
 }
 
@@ -137,6 +142,8 @@ export async function extractTextFromStoredDocument(
     documentId: document.id,
     originalName: document.originalName,
     detectedFormat: format,
+    quoteDate: extractQuoteDateFromText(text),
+    pricingContext: extractDocumentPricingContext(text),
     text,
   }
 }

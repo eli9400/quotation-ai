@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto'
+import { normalizeQuoteCustomFields } from './quote-custom-fields.service.js'
+import { normalizeQuotePricingAdjustments } from './quote-pricing-adjustments.service.js'
 import type { GeneratedQuote, QuoteLineItem } from '../types/quote.js'
 
 function round2(value: number): number {
@@ -48,6 +50,8 @@ export function computeTotals(lineItems: QuoteLineItem[], vatRate: number) {
 
 type BuildQuoteInput = {
   lineItems: QuoteLineItem[]
+  customFields?: GeneratedQuote['customFields']
+  pricingAdjustments?: GeneratedQuote['pricingAdjustments']
   vatRate: number
   estimatedDays: number
   confidence: number
@@ -58,12 +62,16 @@ type BuildQuoteInput = {
 
 export function buildQuoteFromLineItems(input: BuildQuoteInput): GeneratedQuote {
   const lineItems = normalizeLineItems(input.lineItems)
+  const customFields = normalizeQuoteCustomFields(input.customFields)
+  const pricingAdjustments = normalizeQuotePricingAdjustments(input.pricingAdjustments)
   const totals = computeTotals(lineItems, input.vatRate)
   const estimatedDays = Number.isFinite(input.estimatedDays) ? input.estimatedDays : 1
   const confidence = Number.isFinite(input.confidence) ? input.confidence : 60
 
   return {
     lineItems,
+    customFields,
+    pricingAdjustments,
     ...totals,
     estimatedDays: Math.max(1, Math.round(estimatedDays)),
     confidence: Math.max(0, Math.min(100, Math.round(confidence))),

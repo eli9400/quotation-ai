@@ -6,6 +6,7 @@ import type {
 import type { ExtractedDocumentText } from './document-text-extractor.service.js'
 import { inferPricingNumbers } from './pricing-number-inference.service.js'
 import {
+  type ObservationBuildContext,
   buildObservation,
   detectUnit,
   extractNumbers,
@@ -28,7 +29,22 @@ type PendingCandidate = {
   sourceLine: string
 }
 
-function flushPendingCandidate(documentId: string, pending: PendingCandidate) {
+function contextFromDocument(document: ExtractedDocumentText): ObservationBuildContext {
+  return {
+    sourceQuoteDate: document.quoteDate,
+    vatMode: document.pricingContext.vatMode,
+    vatRate: document.pricingContext.vatRate,
+    materialsMode: document.pricingContext.materialsMode,
+    discountPercent: document.pricingContext.discountPercent,
+    discountAmount: document.pricingContext.discountAmount,
+  }
+}
+
+function flushPendingCandidate(
+  documentId: string,
+  context: ObservationBuildContext,
+  pending: PendingCandidate,
+) {
   if (!pending.description || pending.quantity === null || pending.pricePerUnit === null) {
     return null
   }
@@ -43,10 +59,15 @@ function flushPendingCandidate(documentId: string, pending: PendingCandidate) {
     pending.quantity,
     pending.pricePerUnit,
     lineTotal,
+    context,
   )
 }
 
-function tryParseTabularLine(documentId: string, line: string) {
+function tryParseTabularLine(
+  documentId: string,
+  context: ObservationBuildContext,
+  line: string,
+) {
   if (!line.includes('\t')) {
     return null
   }
@@ -97,6 +118,7 @@ function tryParseTabularLine(documentId: string, line: string) {
     quantity,
     pricePerUnit,
     lineTotal,
+    context,
   )
 }
 
@@ -109,9 +131,10 @@ function parseDocumentText(document: ExtractedDocumentText): PricingObservationP
   let skippedLines = 0
   let lastDescription: string | null = null
   let pending: PendingCandidate | null = null
+  const context = contextFromDocument(document)
 
   lines.forEach((rawLine, index) => {
-    const tabularObservation = tryParseTabularLine(document.documentId, rawLine)
+    const tabularObservation = tryParseTabularLine(document.documentId, context, rawLine)
     if (tabularObservation) {
       observations.push(tabularObservation)
       return
@@ -136,7 +159,7 @@ function parseDocumentText(document: ExtractedDocumentText): PricingObservationP
     }
 
     if (pending && index - pending.lineIndex > 3) {
-      const flushed = flushPendingCandidate(document.documentId, pending)
+      const flushed = flushPendingCandidate(document.documentId, context, pending)
       if (flushed) {
         observations.push(flushed)
       } else {
@@ -159,6 +182,7 @@ function parseDocumentText(document: ExtractedDocumentText): PricingObservationP
         inferred.quantity,
         inferred.pricePerUnit,
         inferred.lineTotal,
+        context,
       )
       if (observation) {
         observations.push(observation)
@@ -204,7 +228,7 @@ function parseDocumentText(document: ExtractedDocumentText): PricingObservationP
       }
     }
 
-    const flushed = flushPendingCandidate(document.documentId, pending)
+    const flushed = flushPendingCandidate(document.documentId, context, pending)
     if (flushed) {
       observations.push(flushed)
       pending = null
@@ -212,7 +236,7 @@ function parseDocumentText(document: ExtractedDocumentText): PricingObservationP
   })
 
   if (pending) {
-    const flushed = flushPendingCandidate(document.documentId, pending)
+    const flushed = flushPendingCandidate(document.documentId, context, pending)
     if (flushed) {
       observations.push(flushed)
     } else {

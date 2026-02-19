@@ -1,4 +1,5 @@
 import { env } from '../config/env.js'
+import { parseFlexibleNumber } from './number-parser.service.js'
 import type { PricingUnit } from '../types/model-profile.js'
 import type { PricingObservation } from '../types/pricing-observation.js'
 import type { ExtractedDocumentText } from './document-text-extractor.service.js'
@@ -28,22 +29,7 @@ function tryParseJson<T>(value: string): T | null {
 }
 
 function parseNumber(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
-    return value
-  }
-  if (typeof value !== 'string') {
-    return null
-  }
-
-  const normalized = value.replace(/[₪,\s]/g, '').replace(/[^\d.-]/g, '')
-  if (!normalized) {
-    return null
-  }
-  const parsed = Number(normalized)
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return null
-  }
-  return parsed
+  return parseFlexibleNumber(value, { allowZero: false })
 }
 
 function normalizeUnit(value: unknown, fallbackLine: string): PricingUnit {
@@ -51,6 +37,21 @@ function normalizeUnit(value: unknown, fallbackLine: string): PricingUnit {
     const normalized = value.trim().toLowerCase()
     if (normalized === 'sqm' || normalized === 'm2' || normalized === 'm"ר') {
       return 'sqm'
+    }
+    if (normalized === 'point' || normalized === 'points') {
+      return 'point'
+    }
+    if (normalized === 'day' || normalized === 'days') {
+      return 'day'
+    }
+    if (normalized === 'container' || normalized === 'containers') {
+      return 'container'
+    }
+    if (normalized === 'package') {
+      return 'package'
+    }
+    if (normalized === 'percent' || normalized === '%') {
+      return 'percent'
     }
     if (normalized === 'unit' || normalized === 'pcs') {
       return 'unit'
@@ -69,7 +70,11 @@ function normalizeUnit(value: unknown, fallbackLine: string): PricingUnit {
   return detectUnit(fallbackLine)
 }
 
-function toObservation(documentId: string, item: OpenAiRawItem): PricingObservation | null {
+function toObservation(
+  documentId: string,
+  document: ExtractedDocumentText,
+  item: OpenAiRawItem,
+): PricingObservation | null {
   const rawName = typeof item.rawName === 'string' ? item.rawName.trim() : ''
   const sourceLine =
     typeof item.sourceLine === 'string' && item.sourceLine.trim().length > 0
@@ -85,15 +90,14 @@ function toObservation(documentId: string, item: OpenAiRawItem): PricingObservat
 
   const lineTotal = lineTotalRaw ?? Number((quantity * pricePerUnit).toFixed(2))
   const unit = normalizeUnit(item.unit, sourceLine)
-  return buildObservation(
-    documentId,
-    sourceLine,
-    rawName,
-    unit,
-    quantity,
-    pricePerUnit,
-    lineTotal,
-  )
+  return buildObservation(documentId, sourceLine, rawName, unit, quantity, pricePerUnit, lineTotal, {
+    sourceQuoteDate: document.quoteDate,
+    vatMode: document.pricingContext.vatMode,
+    vatRate: document.pricingContext.vatRate,
+    materialsMode: document.pricingContext.materialsMode,
+    discountPercent: document.pricingContext.discountPercent,
+    discountAmount: document.pricingContext.discountAmount,
+  })
 }
 
 async function extractForSingleDocument(
@@ -101,10 +105,14 @@ async function extractForSingleDocument(
 ): Promise<PricingObservation[]> {
   const prompt = [
     'Extract only real line-items from this quotation.',
-    'Ignore VAT, totals, payment terms, headers, and metadata.',
-    'Return JSON with shape: {"items":[{"rawName":"", "sourceLine":"", "unit":"sqm|unit|hour|meter|fixed|unknown", "quantity":0, "pricePerUnit":0, "lineTotal":0}]}',
+    'Ignore VAT, totals, payment terms, headers, and metadata lines.',
+    'Handle mixed number formats like 1,234.56 and 1.234,56.',
+    'Keep VAT/materials clues in sourceLine if they appear in source text.',
+    'Return JSON with shape: {"items":[{"rawName":"", "sourceLine":"", "unit":"sqm|point|day|container|package|unit|hour|meter|fixed|percent|unknown", "quantity":0, "pricePerUnit":0, "lineTotal":0}]}',
     'Use numeric values only for quantity/pricePerUnit/lineTotal.',
     `Document name: ${document.originalName}`,
+    `Detected quote date: ${document.quoteDate ?? 'unknown'}`,
+    `Detected VAT mode: ${document.pricingContext.vatMode}`,
     'Document text:',
     document.text.slice(0, MAX_DOC_TEXT_CHARS),
   ].join('\n')
@@ -122,8 +130,7 @@ async function extractForSingleDocument(
       messages: [
         {
           role: 'system',
-          content:
-            'You extract structured pricing line-items from contractor quotations.',
+          content: 'You extract structured pricing line-items from contractor quotations.',
         },
         { role: 'user', content: prompt },
       ],
@@ -140,7 +147,7 @@ async function extractForSingleDocument(
   const items = Array.isArray(parsed?.items) ? parsed.items : []
 
   return items
-    .map((item) => toObservation(document.documentId, item))
+    .map((item) => toObservation(document.documentId, document, item))
     .filter((item): item is PricingObservation => item !== null)
 }
 
@@ -156,6 +163,5 @@ export async function extractPricingObservationsWithOpenAi(
     const extracted = await extractForSingleDocument(document)
     observations.push(...extracted)
   }
-
   return observations
 }

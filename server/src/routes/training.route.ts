@@ -1,13 +1,17 @@
 import { Router } from 'express'
 import type { AuthenticatedRequest } from '../middlewares/auth.middleware.js'
 import { requireAuth } from '../middlewares/auth.middleware.js'
-import { resolveTrainingDocumentIds } from '../services/documents.service.js'
+import {
+  findDuplicateDocumentsByHash,
+  resolveTrainingDocumentIds,
+} from '../services/documents.service.js'
 import { runLearningTrainingJob } from '../services/training-learning.service.js'
 import {
   createTrainingJob,
   getLatestCompletedTrainingJobByServiceProvider,
   getTrainingJob,
 } from '../services/training-jobs.service.js'
+import { listUploadedDocumentIdsInDataset } from '../services/training-dataset.service.js'
 
 type StartTrainingRequest = {
   documentIds?: unknown
@@ -70,16 +74,55 @@ trainingRouter.post('/training/start', requireAuth, async (req, res, next) => {
       return
     }
 
-    const job = await createTrainingJob(authReq.authUser.uid, selectedDocumentIds)
+    const [latestCompleted, trainedDocumentIdsFromDataset] = await Promise.all([
+      getLatestCompletedTrainingJobByServiceProvider(authReq.authUser.uid),
+      listUploadedDocumentIdsInDataset(authReq.authUser.uid),
+    ])
+
+    const baselineTrainedDocumentIds =
+      trainedDocumentIdsFromDataset.length > 0
+        ? trainedDocumentIdsFromDataset
+        : latestCompleted?.documentIds ?? []
+    const alreadyTrainedSet = new Set(baselineTrainedDocumentIds)
+    const incrementalDocumentIds = selectedDocumentIds.filter((id) => !alreadyTrainedSet.has(id))
+    if (incrementalDocumentIds.length === 0) {
+      res.status(200).json({
+        ok: true,
+        message: 'No new documents to train. The model is already up to date.',
+        job: latestCompleted,
+      })
+      return
+    }
+
+    const fullTrainedDocumentIds = Array.from(
+      new Set([...baselineTrainedDocumentIds, ...selectedDocumentIds]),
+    )
+
+    const duplicateGroups = await findDuplicateDocumentsByHash(
+      authReq.authUser.uid,
+      incrementalDocumentIds,
+    )
+    if (duplicateGroups.length > 0) {
+      res.status(409).json({
+        ok: false,
+        message:
+          'Training blocked: duplicate files detected in the selected repository documents. Remove duplicates and try again.',
+        duplicates: duplicateGroups,
+      })
+      return
+    }
+
+    const job = await createTrainingJob(authReq.authUser.uid, fullTrainedDocumentIds)
     void runLearningTrainingJob({
       jobId: job.id,
       serviceProviderUid: authReq.authUser.uid,
-      documentIds: selectedDocumentIds,
+      documentIds: fullTrainedDocumentIds,
+      processingDocumentIds: incrementalDocumentIds,
     })
 
     res.status(202).json({
       ok: true,
-      message: 'Training job started.',
+      message: `Training job started for ${incrementalDocumentIds.length} new documents.`,
       job,
     })
   } catch (error) {

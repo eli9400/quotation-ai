@@ -2,6 +2,7 @@ import { Router } from 'express'
 import type { AuthenticatedRequest } from '../middlewares/auth.middleware.js'
 import { requireAuth } from '../middlewares/auth.middleware.js'
 import { documentsUpload } from '../middlewares/upload.middleware.js'
+import { calculateFileHashFromPath, deleteFileIfExists } from '../services/document-hash.service.js'
 import { extractTextFromDocuments } from '../services/document-text-extractor.service.js'
 import {
   deleteStoredDocument,
@@ -16,14 +17,26 @@ type ExtractTextRequestBody = {
   documentIds?: unknown
 }
 
-function mapUploadedFile(file: Express.Multer.File): Omit<StoredDocument, 'serviceProviderUid'> {
+type UploadedDocumentCandidate = Omit<StoredDocument, 'serviceProviderUid'>
+
+type UploadedFileWithMetadata = {
+  document: UploadedDocumentCandidate
+  tempPath: string
+}
+
+async function mapUploadedFile(file: Express.Multer.File): Promise<UploadedFileWithMetadata> {
+  const fileHash = await calculateFileHashFromPath(file.path)
   return {
-    id: file.filename,
-    originalName: file.originalname,
-    storedName: file.filename,
-    mimeType: file.mimetype || 'unknown',
-    size: file.size,
-    uploadedAt: new Date().toISOString(),
+    document: {
+      id: file.filename,
+      originalName: file.originalname,
+      storedName: file.filename,
+      mimeType: file.mimetype || 'unknown',
+      size: file.size,
+      fileHash,
+      uploadedAt: new Date().toISOString(),
+    },
+    tempPath: file.path,
   }
 }
 
@@ -82,12 +95,54 @@ documentsRouter.post(
 
     try {
       const authReq = req as AuthenticatedRequest
-      const documents = files.map(mapUploadedFile)
-      await saveUploadedDocuments(authReq.authUser.uid, documents)
+      const existingDocuments = await listStoredDocuments(authReq.authUser.uid)
+      const existingByHash = new Map(
+        existingDocuments
+          .filter((document) => document.fileHash.trim().length > 0)
+          .map((document) => [document.fileHash, document]),
+      )
+
+      const mappedFiles = await Promise.all(files.map((file) => mapUploadedFile(file)))
+      const acceptedDocuments: UploadedDocumentCandidate[] = []
+      const duplicates: Array<{
+        originalName: string
+        duplicatedWithDocumentId: string
+      }> = []
+
+      for (const candidate of mappedFiles) {
+        const existing = existingByHash.get(candidate.document.fileHash)
+        if (existing) {
+          await deleteFileIfExists(candidate.tempPath)
+          duplicates.push({
+            originalName: candidate.document.originalName,
+            duplicatedWithDocumentId: existing.id,
+          })
+          continue
+        }
+
+        acceptedDocuments.push(candidate.document)
+        existingByHash.set(candidate.document.fileHash, {
+          ...candidate.document,
+          serviceProviderUid: authReq.authUser.uid,
+        })
+      }
+
+      if (acceptedDocuments.length === 0) {
+        res.status(200).json({
+          ok: true,
+          message: 'No new files were added. All uploaded files already exist.',
+          documents: [],
+          duplicates,
+        })
+        return
+      }
+
+      await saveUploadedDocuments(authReq.authUser.uid, acceptedDocuments)
 
       res.status(201).json({
         ok: true,
-        documents,
+        documents: acceptedDocuments,
+        duplicates,
       })
     } catch (error) {
       next(error)
@@ -140,6 +195,8 @@ documentsRouter.post('/documents/extract-text', requireAuth, async (req, res, ne
       id: item.documentId,
       originalName: item.originalName,
       format: item.detectedFormat,
+      quoteDate: item.quoteDate,
+      pricingContext: item.pricingContext,
       textChars: item.text.length,
       preview: item.text.slice(0, 260),
     }))

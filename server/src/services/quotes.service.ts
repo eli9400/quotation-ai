@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { getFirestoreDb } from '../config/firebase.js'
 import { buildQuoteFromLineItems } from './quote-breakdown.service.js'
+import {
+  removeApprovedQuoteFromTrainingDataset,
+  syncApprovedQuoteToTrainingDataset,
+} from './training-dataset-approved-quotes.service.js'
 import type {
   GeneratedQuote,
   QuoteClientRequest,
@@ -8,9 +12,7 @@ import type {
   QuoteSource,
   StoredQuote,
 } from '../types/quote.js'
-
 const QUOTES_COLLECTION = 'quotes'
-
 type SaveQuoteInput = {
   serviceProviderUid: string
   trainingJobId: string
@@ -18,27 +20,22 @@ type SaveQuoteInput = {
   clientRequest: QuoteClientRequest
   quote: GeneratedQuote
 }
-
 type RawStoredQuote = Partial<StoredQuote> & {
   contractorUid?: string
 }
-
 function nowIso(): string {
   return new Date().toISOString()
 }
-
 function quoteRef(quoteId: string) {
   const db = getFirestoreDb()
   return db.collection(QUOTES_COLLECTION).doc(quoteId)
 }
-
 function normalizeSource(value: unknown): QuoteSource {
   if (value === 'openai' || value === 'learned') {
     return value
   }
   return 'fallback'
 }
-
 function normalizeClientRequest(value: unknown): QuoteClientRequest {
   const candidate = (value as QuoteClientRequest) ?? {}
   return {
@@ -51,7 +48,6 @@ function normalizeClientRequest(value: unknown): QuoteClientRequest {
     requestedItems: Array.isArray(candidate.requestedItems) ? candidate.requestedItems : [],
   }
 }
-
 function parseLineItems(value: unknown, fallbackEstimatedPrice: number): QuoteLineItem[] {
   if (!Array.isArray(value)) {
     if (fallbackEstimatedPrice <= 0) {
@@ -69,7 +65,6 @@ function parseLineItems(value: unknown, fallbackEstimatedPrice: number): QuoteLi
       },
     ]
   }
-
   return value
     .map((raw) => {
       const item = raw as Partial<QuoteLineItem>
@@ -90,7 +85,6 @@ function parseLineItems(value: unknown, fallbackEstimatedPrice: number): QuoteLi
     })
     .filter((item): item is QuoteLineItem => item !== null)
 }
-
 function normalizeQuote(value: unknown): GeneratedQuote {
   const candidate = (value as Partial<GeneratedQuote>) ?? {}
   const estimatedPrice = Number(candidate.estimatedPrice)
@@ -101,9 +95,10 @@ function normalizeQuote(value: unknown): GeneratedQuote {
     : []
   const vatRate = Number(candidate.vatRate)
   const safeVatRate = hasExplicitLineItems || Number.isFinite(vatRate) ? vatRate : 0
-
   return buildQuoteFromLineItems({
     lineItems,
+    customFields: candidate.customFields,
+    pricingAdjustments: candidate.pricingAdjustments,
     vatRate: safeVatRate,
     estimatedDays: Number(candidate.estimatedDays),
     confidence: Number(candidate.confidence),
@@ -112,22 +107,18 @@ function normalizeQuote(value: unknown): GeneratedQuote {
     generatedAt: typeof candidate.generatedAt === 'string' ? candidate.generatedAt : nowIso(),
   })
 }
-
 function normalizeStoredQuote(raw: RawStoredQuote): StoredQuote | null {
   if (!raw?.id) {
     return null
   }
-
   const serviceProviderUid = raw.serviceProviderUid ?? raw.contractorUid
   if (!serviceProviderUid) {
     return null
   }
-
   const createdAt = typeof raw.createdAt === 'string' ? raw.createdAt : nowIso()
   const updatedAt = typeof raw.updatedAt === 'string' ? raw.updatedAt : createdAt
   const status = raw.status === 'approved' ? 'approved' : 'draft'
   const approvedAt = status === 'approved' ? raw.approvedAt ?? updatedAt : null
-
   return {
     id: raw.id,
     serviceProviderUid,
@@ -142,7 +133,6 @@ function normalizeStoredQuote(raw: RawStoredQuote): StoredQuote | null {
     approvedByServiceProviderUid: raw.approvedByServiceProviderUid ?? null,
   }
 }
-
 export async function saveGeneratedQuote(input: SaveQuoteInput): Promise<StoredQuote> {
   const timestamp = nowIso()
   const savedQuote: StoredQuote = {
@@ -158,11 +148,9 @@ export async function saveGeneratedQuote(input: SaveQuoteInput): Promise<StoredQ
     approvedAt: null,
     approvedByServiceProviderUid: null,
   }
-
   await quoteRef(savedQuote.id).set(savedQuote, { merge: true })
   return savedQuote
 }
-
 async function listByField(fieldName: string, uid: string): Promise<StoredQuote[]> {
   const db = getFirestoreDb()
   const snapshot = await db.collection(QUOTES_COLLECTION).where(fieldName, '==', uid).limit(200).get()
@@ -170,7 +158,6 @@ async function listByField(fieldName: string, uid: string): Promise<StoredQuote[
     .map((doc) => normalizeStoredQuote(doc.data() as RawStoredQuote))
     .filter((item): item is StoredQuote => item !== null)
 }
-
 export async function getQuoteById(quoteId: string): Promise<StoredQuote | null> {
   const snapshot = await quoteRef(quoteId).get()
   if (!snapshot.exists) {
@@ -178,18 +165,15 @@ export async function getQuoteById(quoteId: string): Promise<StoredQuote | null>
   }
   return normalizeStoredQuote(snapshot.data() as RawStoredQuote)
 }
-
 export async function listQuotesByServiceProvider(serviceProviderUid: string): Promise<StoredQuote[]> {
   const [newQuotes, legacyQuotes] = await Promise.all([
     listByField('serviceProviderUid', serviceProviderUid),
     listByField('contractorUid', serviceProviderUid),
   ])
-
   const unique = new Map<string, StoredQuote>()
   ;[...newQuotes, ...legacyQuotes].forEach((quote) => unique.set(quote.id, quote))
   return Array.from(unique.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
-
 export async function updateQuoteForServiceProvider(
   quoteId: string,
   serviceProviderUid: string,
@@ -199,17 +183,19 @@ export async function updateQuoteForServiceProvider(
   if (!existing || existing.serviceProviderUid !== serviceProviderUid) {
     return null
   }
-
   const updatedAt = nowIso()
   const normalizedQuote = normalizeQuote(quote)
   await quoteRef(quoteId).set({ quote: normalizedQuote, updatedAt }, { merge: true })
-  return {
+  const updatedRecord = {
     ...existing,
     quote: normalizedQuote,
     updatedAt,
   }
+  if (updatedRecord.status === 'approved') {
+    await syncApprovedQuoteToTrainingDataset(updatedRecord)
+  }
+  return updatedRecord
 }
-
 export async function approveQuoteForServiceProvider(
   quoteId: string,
   serviceProviderUid: string,
@@ -218,22 +204,21 @@ export async function approveQuoteForServiceProvider(
   if (!existing || existing.serviceProviderUid !== serviceProviderUid) {
     return null
   }
-
   const timestamp = nowIso()
   await quoteRef(quoteId).set(
     { status: 'approved', approvedAt: timestamp, approvedByServiceProviderUid: serviceProviderUid, updatedAt: timestamp },
     { merge: true },
   )
-
-  return {
+  const approvedRecord: StoredQuote = {
     ...existing,
     status: 'approved',
     approvedAt: timestamp,
     approvedByServiceProviderUid: serviceProviderUid,
     updatedAt: timestamp,
   }
+  await syncApprovedQuoteToTrainingDataset(approvedRecord)
+  return approvedRecord
 }
-
 export async function deleteQuoteForServiceProvider(
   quoteId: string,
   serviceProviderUid: string,
@@ -242,7 +227,9 @@ export async function deleteQuoteForServiceProvider(
   if (!existing || existing.serviceProviderUid !== serviceProviderUid) {
     return false
   }
-
   await quoteRef(quoteId).delete()
+  if (existing.status === 'approved') {
+    await removeApprovedQuoteFromTrainingDataset(serviceProviderUid, quoteId)
+  }
   return true
 }

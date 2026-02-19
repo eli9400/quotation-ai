@@ -34,7 +34,7 @@ export function DocumentsPanel({
       </label>
 
       {documents.length === 0 ? (
-        <p className="empty">עדיין לא הועלו מסמכים.</p>
+        <p className="empty">אין קבצים חדשים שממתינים לאימון.</p>
       ) : (
         <ul className="doc-list">
           {documents.map((doc) => (

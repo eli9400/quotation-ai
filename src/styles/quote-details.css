@@ -90,6 +90,7 @@
 }
 
 .quote-edit-form input,
+.quote-edit-form select,
 .quote-edit-form textarea {
   border: 1px solid #d7e7e0;
   border-radius: 10px;
@@ -155,10 +156,106 @@
   margin: 0.25rem 0;
 }
 
+.quote-cpi-toggle {
+  display: flex !important;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.quote-cpi-toggle input {
+  width: 18px;
+  height: 18px;
+}
+
+.quote-cpi-caption {
+  margin: 0;
+  color: #426157;
+  font-size: 0.84rem;
+}
+
 .quote-edit-actions {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+.quote-custom-fields {
+  border: 1px solid #dcebe5;
+  border-radius: 10px;
+  padding: 0.6rem;
+  background: #f9fffc;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.quote-custom-fields h5 {
+  margin: 0;
+}
+
+.quote-custom-fields-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #456258;
+}
+
+.quote-custom-fields-table-wrap {
+  border: 1px solid #dcebe5;
+  border-radius: 10px;
+  overflow-x: auto;
+}
+
+.quote-custom-fields-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 690px;
+}
+
+.quote-custom-fields-table th,
+.quote-custom-fields-table td {
+  border-bottom: 1px solid #e5f0eb;
+  padding: 0.35rem;
+  text-align: right;
+}
+
+.quote-custom-fields-table input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+}
+
+.quote-client-preview {
+  border: 1px solid #dcebe5;
+  border-radius: 10px;
+  padding: 0.6rem;
+  background: #f9fffc;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.quote-client-preview h5 {
+  margin: 0;
+}
+
+.quote-client-preview p {
+  margin: 0;
+}
+
+.quote-client-preview-fields {
+  border: 1px solid #dcebe5;
+  border-radius: 10px;
+  padding: 0.5rem;
+  background: #ffffff;
+}
+
+.quote-client-preview-fields strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.quote-client-preview-fields ul {
+  margin: 0;
+  padding-right: 1rem;
+  display: grid;
+  gap: 0.2rem;
 }
 
 @media (max-width: 980px) {

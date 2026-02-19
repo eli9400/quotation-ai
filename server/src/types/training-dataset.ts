@@ -1,4 +1,5 @@
 import type { PricingUnit } from './model-profile.js'
+import type { CustomFeatureValue } from './custom-feature.js'
 
 export type DatasetSplit = 'train' | 'validation' | 'test'
 
@@ -9,6 +10,7 @@ export type TrainingDatasetExample = {
   serviceProviderUid: string
   source: DatasetExampleSource
   sourceDocumentId: string | null
+  sourceQuoteDate: string | null
   sourceQuoteId: string | null
   sourceTrainingJobId: string | null
   itemKey: string
@@ -23,6 +25,8 @@ export type TrainingDatasetExample = {
   featureRequirements: string | null
   featureInventorySurplus: number | null
   featureAvailableWorkers: number | null
+  featureDynamicValues: Record<string, CustomFeatureValue>
+  featureDynamicVisibility: Record<string, boolean>
   split: DatasetSplit
   createdAt: string
   updatedAt: string

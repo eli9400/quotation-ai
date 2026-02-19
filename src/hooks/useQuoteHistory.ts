@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { listQuotes } from '../services/api/quotationApi'
 import type { StoredQuoteRecord } from '../types/quotation'
 
@@ -57,14 +57,14 @@ export function useQuoteHistory({
     }
   }, [authToken, onError])
 
-  const appendQuoteRecord = (record: StoredQuoteRecord) => {
+  const appendQuoteRecord = useCallback((record: StoredQuoteRecord) => {
     setQuoteHistory((current) => [record, ...current.filter((item) => item.id !== record.id)])
-  }
+  }, [])
 
-  const clearQuoteHistory = () => {
+  const clearQuoteHistory = useCallback(() => {
     setQuoteHistory([])
     setIsLoadingQuotes(false)
-  }
+  }, [])
 
   return {
     quoteHistory,

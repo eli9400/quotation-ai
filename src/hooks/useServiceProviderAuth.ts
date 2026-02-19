@@ -1,7 +1,7 @@
 import { FirebaseError } from 'firebase/app'
 import {
   createUserWithEmailAndPassword,
-  onAuthStateChanged,
+  onIdTokenChanged,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
@@ -47,7 +47,7 @@ export function useServiceProviderAuth() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(firebaseAuth, async (nextUser) => {
+    const unsubscribe = onIdTokenChanged(firebaseAuth, async (nextUser) => {
       setUser(nextUser)
       setErrorMessage(null)
 

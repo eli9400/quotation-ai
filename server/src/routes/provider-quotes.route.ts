@@ -69,6 +69,8 @@ function parseGeneratedQuote(value: unknown): GeneratedQuote | null {
 
   return buildQuoteFromLineItems({
     lineItems,
+    customFields: candidate.customFields as GeneratedQuote['customFields'],
+    pricingAdjustments: candidate.pricingAdjustments as GeneratedQuote['pricingAdjustments'],
     vatRate: Number(candidate.vatRate),
     estimatedDays: Number(candidate.estimatedDays),
     confidence: Number(candidate.confidence),

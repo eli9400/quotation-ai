@@ -2,13 +2,16 @@ import { createHash } from 'node:crypto'
 import { getFirestoreDb } from '../config/firebase.js'
 import { shouldKeepPricingObservation } from './pricing-items-learning.service.js'
 import {
+  buildDynamicFeaturePayload,
+  listServiceProviderFeatures,
+} from './service-provider-features.service.js'
+import {
   assignDatasetSplitsByItemDocument,
   resolveObservationSplit,
 } from './training-dataset-split.service.js'
 import { buildTrainingDatasetStats } from './training-dataset-stats.service.js'
 import type { PricingObservation } from '../types/pricing-observation.js'
 import type {
-  DatasetExampleSource,
   RebuildTrainingDatasetResult,
   TrainingDatasetExample,
   TrainingDatasetStats,
@@ -72,6 +75,7 @@ function toExamples(
   serviceProviderUid: string,
   trainingJobId: string,
   observations: PricingObservation[],
+  dynamicFeatures: ReturnType<typeof buildDynamicFeaturePayload>,
 ): TrainingDatasetExample[] {
   const splitAssignment = assignDatasetSplitsByItemDocument(observations)
   const duplicateCounter = new Map<string, number>()
@@ -98,6 +102,7 @@ function toExamples(
       serviceProviderUid,
       source: 'uploaded_document',
       sourceDocumentId: observation.sourceDocumentId,
+      sourceQuoteDate: observation.sourceQuoteDate,
       sourceQuoteId: null,
       sourceTrainingJobId: trainingJobId,
       itemKey: toItemKey(observation),
@@ -112,6 +117,8 @@ function toExamples(
       featureRequirements: null,
       featureInventorySurplus: null,
       featureAvailableWorkers: null,
+      featureDynamicValues: { ...dynamicFeatures.values },
+      featureDynamicVisibility: { ...dynamicFeatures.visibility },
       split: resolveObservationSplit(splitAssignment, observation),
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -141,14 +148,24 @@ async function commitInBatches(
   }
 }
 
-async function deleteExamplesBySource(
+async function deleteExamplesByDocumentIds(
   serviceProviderUid: string,
-  source: DatasetExampleSource,
+  sourceDocumentIds: string[],
 ): Promise<void> {
+  const documentIdSet = new Set(sourceDocumentIds.filter((id) => id.trim().length > 0))
+  if (documentIdSet.size === 0) {
+    return
+  }
+
   const db = getFirestoreDb()
   const existing = await listExamplesByServiceProvider(serviceProviderUid)
   const operations = existing
-    .filter((example) => example.source === source)
+    .filter(
+      (example) =>
+        example.source === 'uploaded_document' &&
+        example.sourceDocumentId !== null &&
+        documentIdSet.has(example.sourceDocumentId),
+    )
     .map((example) => (batch: FirebaseFirestore.WriteBatch) => {
       batch.delete(db.collection(TRAINING_DATASET_COLLECTION).doc(example.id))
     })
@@ -159,10 +176,28 @@ export async function rebuildTrainingDatasetFromObservations(
   input: RebuildInput,
 ): Promise<RebuildTrainingDatasetResult> {
   const filtered = sanitizeObservations(input.observations)
-  const examples = toExamples(input.serviceProviderUid, input.trainingJobId, filtered)
-  const db = getFirestoreDb()
+  if (filtered.length === 0) {
+    const existing = await listExamplesByServiceProvider(input.serviceProviderUid)
+    const stats = buildTrainingDatasetStats(input.serviceProviderUid, existing)
+    return {
+      totalExamples: stats.totalExamples,
+      splitCounts: stats.splitCounts,
+      uniqueItems: stats.uniqueItems,
+    }
+  }
 
-  await deleteExamplesBySource(input.serviceProviderUid, 'uploaded_document')
+  const featureDefinitions = await listServiceProviderFeatures(input.serviceProviderUid)
+  const dynamicFeatures = buildDynamicFeaturePayload(featureDefinitions)
+  const examples = toExamples(
+    input.serviceProviderUid,
+    input.trainingJobId,
+    filtered,
+    dynamicFeatures,
+  )
+  const db = getFirestoreDb()
+  const sourceDocumentIds = Array.from(new Set(filtered.map((observation) => observation.sourceDocumentId)))
+
+  await deleteExamplesByDocumentIds(input.serviceProviderUid, sourceDocumentIds)
   const writes = examples.map((example) => (batch: FirebaseFirestore.WriteBatch) => {
     batch.set(db.collection(TRAINING_DATASET_COLLECTION).doc(example.id), example)
   })
@@ -173,7 +208,7 @@ export async function rebuildTrainingDatasetFromObservations(
   await db.collection(TRAINING_DATASET_STATS_COLLECTION).doc(input.serviceProviderUid).set(stats)
 
   return {
-    totalExamples: examples.length,
+    totalExamples: stats.totalExamples,
     splitCounts: stats.splitCounts,
     uniqueItems: stats.uniqueItems,
   }
@@ -191,4 +226,17 @@ export async function getTrainingDatasetStats(
     return null
   }
   return snapshot.data() as TrainingDatasetStats
+}
+
+export async function listUploadedDocumentIdsInDataset(
+  serviceProviderUid: string,
+): Promise<string[]> {
+  const examples = await listExamplesByServiceProvider(serviceProviderUid)
+  return Array.from(
+    new Set(
+      examples
+        .filter((example) => example.source === 'uploaded_document' && example.sourceDocumentId)
+        .map((example) => example.sourceDocumentId as string),
+    ),
+  )
 }
