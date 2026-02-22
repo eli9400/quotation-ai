@@ -170,6 +170,19 @@ function buildDynamicDetails(requestedItems: QuoteRequestedItem[]): string[] {
   return requestedItems.map((item) => `${item.label}: ${item.quantity}`)
 }
 
+function buildIntakeDetails(schema: DynamicFormSchema, formValues: FormValues): string[] {
+  return schema.fields
+    .filter((field) => isClientVisibleField(field))
+    .filter((field) => field.id !== 'clientName' && field.id !== 'clientEmail')
+    .filter((field) => field.id !== 'requirements' && field.role !== 'input_qty')
+    .map((field) => {
+      const value = toStringValue(formValues[field.id])
+      if (!value) return null
+      return `${field.label}: ${value}`
+    })
+    .filter((line): line is string => line !== null)
+}
+
 export function parsePublicClientRequestFromSchema(
   schema: DynamicFormSchema,
   formValues: unknown,
@@ -196,9 +209,11 @@ export function parsePublicClientRequestFromSchema(
   ])
 
   const freeTextRequirements = toStringValue(values.requirements)
+  const intakeDetails = buildIntakeDetails(schema, values)
   const dynamicDetails = buildDynamicDetails(requestedItems)
   const requirements = [
     freeTextRequirements,
+    intakeDetails.length > 0 ? `פרטים ראשוניים:\n${intakeDetails.join('\n')}` : '',
     dynamicDetails.length > 0 ? `נתוני כמויות:\n${dynamicDetails.join('\n')}` : '',
   ]
     .filter((part) => part.trim().length > 0)

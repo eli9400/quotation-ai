@@ -113,13 +113,6 @@ quotesRouter.post('/public/quotes/request', async (req, res, next) => {
     }
 
     const latestJob = await getLatestCompletedTrainingJobByServiceProvider(serviceProvider.uid)
-    if (!latestJob) {
-      res.status(409).json({
-        ok: false,
-        message: 'No completed training model found for this service provider.',
-      })
-      return
-    }
 
     const schema = await buildDynamicFormSchema(serviceProvider.uid)
     const parsed = parsePublicClientRequestFromSchema(
@@ -134,7 +127,7 @@ quotesRouter.post('/public/quotes/request', async (req, res, next) => {
 
     const result = await generateAndStoreQuote({
       serviceProviderUid: serviceProvider.uid,
-      trainingJobId: latestJob.id,
+      trainingJobId: latestJob?.id ?? '',
       clientRequest: parsed.request,
     })
     res.status(201).json({

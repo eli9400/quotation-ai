@@ -1,6 +1,6 @@
 import { env } from '../../config/env'
 import type {
-  ServiceProviderIndustry,
+  ServiceProviderIndustryCategory,
   ServiceProviderProfile,
   ServiceProviderPublicProfile,
 } from '../../types/serviceProvider'
@@ -22,6 +22,11 @@ type UpdateServiceProviderResponse = {
   ok: boolean
   serviceProvider?: ServiceProviderProfile
   contractor?: ServiceProviderProfile
+}
+
+type ListIndustriesResponse = {
+  ok: boolean
+  categories: ServiceProviderIndustryCategory[]
 }
 
 function apiUrl(path: string): string {
@@ -56,7 +61,7 @@ export async function fetchServiceProviderByCode(
 
 export async function updateServiceProviderIndustry(
   idToken: string,
-  industry: ServiceProviderIndustry,
+  industry: string,
 ): Promise<ServiceProviderProfile> {
   const payload = await requestJson<UpdateServiceProviderResponse>(apiUrl('/service-providers/me'), {
     method: 'PATCH',
@@ -71,4 +76,11 @@ export async function updateServiceProviderIndustry(
     throw new Error('Service provider profile is missing from API response.')
   }
   return profile
+}
+
+export async function fetchServiceProviderIndustryCatalog(): Promise<ServiceProviderIndustryCategory[]> {
+  const payload = await requestJson<ListIndustriesResponse>(apiUrl('/service-providers/industries'), {
+    method: 'GET',
+  })
+  return payload.categories ?? []
 }

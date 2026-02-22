@@ -23,6 +23,12 @@ export function QuoteLineItemsTable({
   onLineChange,
   onRemoveLine,
 }: QuoteLineItemsTableProps) {
+  const isUnknownLine = (sourceItemId: string | null, description: string): boolean => {
+    if (description.trim().length === 0) return false
+    if (!sourceItemId) return true
+    return sourceItemId.startsWith('catalog_')
+  }
+
   return (
     <div className="quote-lines-table-wrap">
       <table className="quote-lines-table">
@@ -48,7 +54,7 @@ export function QuoteLineItemsTable({
           {lineItems.map((line, index) => (
             <tr
               key={line.id}
-              className={!line.sourceItemId && line.description.trim().length > 0 ? 'line-unknown' : undefined}
+              className={isUnknownLine(line.sourceItemId, line.description) ? 'line-unknown' : undefined}
             >
               <td>
                 <input

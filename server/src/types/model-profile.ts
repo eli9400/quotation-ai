@@ -35,7 +35,7 @@ export type LearnedPricingItem = {
   lastUpdatedAt: string
 }
 
-export type DynamicFieldType = 'number' | 'text' | 'select' | 'textarea'
+export type DynamicFieldType = 'number' | 'text' | 'select' | 'textarea' | 'date'
 export type FormFieldVisibility = 'client' | 'provider' | 'internal'
 export type FormFieldEditor = 'client' | 'provider' | 'internal'
 export type FormFieldRole = 'input_qty' | 'contact' | 'requirements' | 'internal_meta'

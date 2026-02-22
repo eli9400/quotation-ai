@@ -11,7 +11,9 @@ import {
 import { fetchServiceProviderByCode } from '../../services/api/serviceProvidersApi'
 import type { FormPreviewSchema, Quote, StoredQuoteRecord } from '../../types/quotation'
 import type { ServiceProviderPublicProfile } from '../../types/serviceProvider'
+import { useVehicleCatalogOptions } from '../../hooks/useVehicleCatalogOptions'
 import { PrimaryButton } from '../ui/PrimaryButton'
+import { ClientDynamicFieldInput } from './ClientDynamicFieldInput'
 import { ClientQuotesPanel } from './ClientQuotesPanel'
 import { ClientRequestedItemsEditor } from './ClientRequestedItemsEditor'
 import {
@@ -39,6 +41,15 @@ export function ClientAccessPanel() {
   const [isSubmittingRevision, setIsSubmittingRevision] = useState(false)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const selectedManufacturer = formValues.intake_vehicleBrand ?? ''
+  const selectedVehicleYear = formValues.intake_vehicleYear ?? ''
+  const selectedVehicleType = formValues.intake_vehicleType ?? ''
+  const { manufacturerOptions, modelOptions, trimOptions } = useVehicleCatalogOptions(
+    schema,
+    selectedManufacturer,
+    selectedVehicleYear,
+    selectedVehicleType,
+  )
 
   const canLookup = useMemo(
     () =>
@@ -98,7 +109,17 @@ export function ClientAccessPanel() {
   }
 
   const handleFieldChange = (fieldId: string, value: string) =>
-    setFormValues((current) => ({ ...current, [fieldId]: value }))
+    setFormValues((current) => {
+      const next = { ...current, [fieldId]: value }
+      if (fieldId === 'intake_vehicleType') {
+        next.intake_vehicleBrand = ''
+        next.intake_vehicleModel = ''
+      }
+      if (fieldId === 'intake_vehicleBrand') {
+        next.intake_vehicleModel = ''
+      }
+      return next
+    })
 
   const handleFormReset = () => {
     if (!schema) return
@@ -156,31 +177,16 @@ export function ClientAccessPanel() {
         <form className="auth-form client-form" onSubmit={handleFormSubmit}>
           <div className="client-form-fields">
             {orderedFields.map((field) => (
-              <label key={field.id}>
-                {field.label}
-                {field.required ? ' *' : ''}
-                {field.type === 'textarea' ? (
-                  <textarea
-                    rows={4}
-                    value={formValues[field.id] ?? ''}
-                    onChange={(event) => handleFieldChange(field.id, event.target.value)}
-                    placeholder={field.placeholder ?? ''}
-                  />
-                ) : field.type === 'select' ? (
-                  <select value={formValues[field.id] ?? ''} onChange={(event) => handleFieldChange(field.id, event.target.value)}>
-                    <option value="">בחרו</option>
-                    {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
-                  </select>
-                ) : (
-                  <input
-                    type={field.type === 'number' ? 'number' : 'text'}
-                    min={field.type === 'number' ? 0 : undefined}
-                    value={formValues[field.id] ?? ''}
-                    onChange={(event) => handleFieldChange(field.id, event.target.value)}
-                    placeholder={field.placeholder ?? ''}
-                  />
-                )}
-              </label>
+              <ClientDynamicFieldInput
+                key={field.id}
+                field={field}
+                value={formValues[field.id] ?? ''}
+                disabled={isLoading}
+                manufacturerOptions={manufacturerOptions}
+                modelOptions={modelOptions}
+                trimOptions={trimOptions}
+                onChange={(value) => handleFieldChange(field.id, value)}
+              />
             ))}
           </div>
 

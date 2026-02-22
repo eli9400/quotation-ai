@@ -105,7 +105,7 @@ export type StoredQuoteRecord = {
 export type FormPreviewField = {
   id: string
   label: string
-  type: 'number' | 'text' | 'select' | 'textarea'
+  type: 'number' | 'text' | 'select' | 'textarea' | 'date'
   role: 'input_qty' | 'contact' | 'requirements' | 'internal_meta'
   visibleTo: 'client' | 'provider' | 'internal'
   editableBy: 'client' | 'provider' | 'internal'

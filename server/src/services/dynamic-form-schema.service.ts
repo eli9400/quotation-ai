@@ -1,9 +1,13 @@
 import { env } from '../config/env.js'
 import { getFirestoreDb } from '../config/firebase.js'
+import { baseContactFields, requirementsField } from './dynamic-form-core-fields.service.js'
+import { buildIntakeDynamicFields } from './dynamic-form-intake-fields.service.js'
 import {
   DYNAMIC_FORM_SCHEMAS_COLLECTION,
   PRICING_ITEMS_COLLECTION,
 } from './model-profile.service.js'
+import { getServiceProviderByUid } from './service-providers.service.js'
+import { getServiceProviderIntakeTemplateByIndustry } from './service-provider-intake-templates.service.js'
 import type {
   DynamicFormField,
   DynamicFormSchema,
@@ -122,7 +126,13 @@ function titleFromItem(item: LearnedPricingItem): string {
 }
 
 function isClientUnitAllowed(unit: PricingUnit): boolean {
-  return unit !== 'unknown' && unit !== 'percent' && unit !== 'fixed' && unit !== 'day'
+  return (
+    unit !== 'unknown' &&
+    unit !== 'percent' &&
+    unit !== 'fixed' &&
+    unit !== 'day' &&
+    unit !== 'hour'
+  )
 }
 
 function isClientSafeItem(item: LearnedPricingItem): boolean {
@@ -187,14 +197,6 @@ function toNumberField(item: LearnedPricingItem, order: number): DynamicFormFiel
   }
 }
 
-function baseFields(): DynamicFormField[] {
-  return [
-    { id: 'clientName', label: 'שם לקוח', type: 'text', role: 'contact', visibleTo: 'client', editableBy: 'client', required: true, order: 1, sourceItemId: null, placeholder: 'ישראל ישראלי', hint: null, options: [] },
-    { id: 'clientEmail', label: 'אימייל לקוח', type: 'text', role: 'contact', visibleTo: 'client', editableBy: 'client', required: true, order: 2, sourceItemId: null, placeholder: 'client@example.com', hint: null, options: [] },
-    { id: 'requirements', label: 'הערות ודרישות', type: 'textarea', role: 'requirements', visibleTo: 'client', editableBy: 'client', required: false, order: 3, sourceItemId: null, placeholder: 'פרטים נוספים על העבודה', hint: null, options: [] },
-  ]
-}
-
 export async function listLearnedPricingItems(
   serviceProviderUid: string,
 ): Promise<LearnedPricingItem[]> {
@@ -210,12 +212,20 @@ export async function listLearnedPricingItems(
 export async function buildDynamicFormSchema(
   serviceProviderUid: string,
 ): Promise<DynamicFormSchema> {
-  const learnedItems = await listLearnedPricingItems(serviceProviderUid)
+  const [learnedItems, serviceProviderProfile] = await Promise.all([
+    listLearnedPricingItems(serviceProviderUid),
+    getServiceProviderByUid(serviceProviderUid),
+  ])
+  const intakeTemplate = await getServiceProviderIntakeTemplateByIndustry(
+    serviceProviderProfile?.industry ?? '',
+  )
   const selectedItems = dedupeItemsForClient(learnedItems.filter(isClientSafeItem)).slice(
     0,
     MAX_DYNAMIC_FIELDS,
   )
-  const fields = baseFields()
+  const fields = baseContactFields()
+  fields.push(...buildIntakeDynamicFields(intakeTemplate.fields, fields.length + 1))
+  fields.push(requirementsField(fields.length + 1))
   const startOrder = fields.length + 1
   selectedItems.forEach((item, index) => fields.push(toNumberField(item, startOrder + index)))
 

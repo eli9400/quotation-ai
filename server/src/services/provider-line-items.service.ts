@@ -1,7 +1,10 @@
 import { listLearnedPricingItems } from './dynamic-form-schema.service.js'
+import { getCatalogLineItemsForIndustry } from './provider-line-items.catalog.js'
+import {
+  getServiceProviderIndustryMeta,
+} from './service-provider-industries.service.js'
 import { getServiceProviderByUid } from './service-providers.service.js'
 import type { PricingUnit } from '../types/model-profile.js'
-import type { ServiceProviderIndustry } from '../types/service-provider.js'
 
 export type ProviderLineItemOption = {
   id: string
@@ -12,13 +15,6 @@ export type ProviderLineItemOption = {
   sampleLines: number
   quantityPriceSamples: Array<{ quantity: number; unitPrice: number }>
   isProviderOnly: boolean
-}
-
-type CatalogItem = {
-  key: string
-  name: string
-  unit: PricingUnit
-  aliases?: string[]
 }
 
 const PROVIDER_ONLY_PATTERNS = [
@@ -44,73 +40,54 @@ const CLIENT_UNITS = new Set<PricingUnit>([
   'point',
   'container',
   'package',
-  'hour',
   'meter',
 ])
-
-const INDUSTRY_CATALOG: Record<ServiceProviderIndustry, CatalogItem[]> = {
-  general: [
-    { key: 'painting_walls', name: 'צביעת קירות ותקרות', unit: 'sqm' },
-    { key: 'plaster_walls', name: 'שפכטל והכנת קירות', unit: 'sqm' },
-    { key: 'floor_tiles', name: 'ריצוף גרניט פורצלן', unit: 'sqm' },
-    { key: 'electrical_point', name: 'התקנת נקודת חשמל', unit: 'point' },
-    { key: 'water_point', name: 'נקודת מים/ביוב', unit: 'point' },
-    { key: 'debris_container', name: 'פינוי מכולה פסולת', unit: 'container' },
-  ],
-  renovation: [
-    { key: 'demolition', name: 'פירוק והריסה', unit: 'sqm' },
-    { key: 'plaster_walls', name: 'שפכטל והכנת קירות', unit: 'sqm' },
-    { key: 'painting_walls', name: 'צביעת קירות ותקרות', unit: 'sqm' },
-    { key: 'floor_tiles', name: 'ריצוף גרניט פורצלן', unit: 'sqm' },
-    { key: 'bath_cladding', name: 'חיפוי קירות אמבטיה', unit: 'sqm' },
-    { key: 'laminate_floor', name: 'התקנת פרקט למינציה', unit: 'sqm' },
-  ],
-  electrical: [
-    { key: 'electrical_point', name: 'התקנת נקודת חשמל', unit: 'point' },
-    { key: 'lighting_point', name: 'התקנת נקודת תאורה', unit: 'point' },
-    { key: 'switch_socket', name: 'החלפת מפסק/שקע', unit: 'unit' },
-    { key: 'panel_upgrade', name: 'שדרוג לוח חשמל', unit: 'unit' },
-    { key: 'network_point', name: 'נקודת תקשורת', unit: 'point' },
-  ],
-  plumbing: [
-    { key: 'water_point', name: 'נקודת מים/ביוב', unit: 'point' },
-    { key: 'sink_install', name: 'התקנת כיור', unit: 'unit' },
-    { key: 'toilet_install', name: 'התקנת אסלה', unit: 'unit' },
-    { key: 'faucet_replace', name: 'החלפת ברז', unit: 'unit' },
-    { key: 'pipe_repair', name: 'תיקון צנרת', unit: 'meter' },
-  ],
-  painting: [
-    { key: 'painting_walls', name: 'צביעת קירות ותקרות', unit: 'sqm' },
-    { key: 'plaster_walls', name: 'שפכטל והכנת קירות', unit: 'sqm' },
-    { key: 'primer_coat', name: 'צביעת יסוד', unit: 'sqm' },
-    { key: 'door_paint', name: 'צביעת דלת/משקוף', unit: 'unit' },
-  ],
-  cleaning: [
-    { key: 'standard_cleaning', name: 'ניקיון סטנדרטי', unit: 'sqm' },
-    { key: 'post_renovation', name: 'ניקיון אחרי שיפוץ', unit: 'sqm' },
-    { key: 'window_cleaning', name: 'ניקוי חלונות', unit: 'sqm' },
-    { key: 'pressure_wash', name: 'שטיפה בלחץ', unit: 'sqm' },
-  ],
-  hvac: [
-    { key: 'ac_install', name: 'התקנת מזגן', unit: 'unit' },
-    { key: 'ac_service', name: 'טיפול תקופתי למזגן', unit: 'unit' },
-    { key: 'ac_repair', name: 'תיקון מזגן', unit: 'unit' },
-    { key: 'drain_pipe', name: 'התקנת צנרת ניקוז', unit: 'meter' },
-  ],
-  gardening: [
-    { key: 'lawn_setup', name: 'הקמת דשא', unit: 'sqm' },
-    { key: 'irrigation_point', name: 'נקודת השקיה', unit: 'point' },
-    { key: 'tree_trimming', name: 'גיזום עצים', unit: 'unit' },
-    { key: 'garden_maintenance', name: 'תחזוקת גינה', unit: 'hour' },
-  ],
-}
 
 function normalizeLabel(label: string): string {
   return label.replace(/\s+/g, ' ').trim()
 }
 
 function normalizeForKey(value: string): string {
-  return value.toLowerCase().replace(/[+/_-]+/g, ' ').replace(/[^a-z0-9\u0590-\u05ff\s]/g, ' ').replace(/\s+/g, ' ').trim()
+  return value
+    .toLowerCase()
+    .replace(/[+/_-]+/g, ' ')
+    .replace(/[^a-z0-9\u0590-\u05ff\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function isNearDuplicateName(left: string, right: string): boolean {
+  if (!left || !right || left === right) return false
+  const leftWords = left.split(' ').filter((word) => word.length > 0)
+  const rightWords = right.split(' ').filter((word) => word.length > 0)
+  if (leftWords.length < 2 || rightWords.length < 2) return false
+
+  const shorter = left.length <= right.length ? left : right
+  const longer = left.length <= right.length ? right : left
+  if (shorter.length >= 8 && longer.includes(shorter)) return true
+
+  const rightSet = new Set(rightWords)
+  const intersection = leftWords.filter((word) => rightSet.has(word)).length
+  const minWords = Math.min(leftWords.length, rightWords.length)
+  return intersection >= minWords && Math.abs(leftWords.length - rightWords.length) <= 1
+}
+
+function findGroupedKey(
+  grouped: Map<string, ProviderLineItemOption>,
+  normalizedName: string,
+  unit: PricingUnit,
+): string {
+  const exactKey = `${normalizedName}|${unit}`
+  if (grouped.has(exactKey)) return exactKey
+  for (const key of grouped.keys()) {
+    const separatorIndex = key.lastIndexOf('|')
+    if (separatorIndex <= 0) continue
+    const groupedName = key.slice(0, separatorIndex)
+    const groupedUnit = key.slice(separatorIndex + 1) as PricingUnit
+    if (groupedUnit !== unit) continue
+    if (isNearDuplicateName(groupedName, normalizedName)) return key
+  }
+  return exactKey
 }
 
 function isProviderOnly(unit: PricingUnit, label: string): boolean {
@@ -124,25 +101,30 @@ function buildDisplayLabel(label: string, unit: PricingUnit): string {
 
 function toLearnedOption(item: Awaited<ReturnType<typeof listLearnedPricingItems>>[number]): ProviderLineItemOption {
   const primaryAlias = item.aliases?.find((value) => value.trim().length > 0)
-  const rawLabel = normalizeLabel(primaryAlias || item.canonicalName)
+  const canonicalName = normalizeLabel(primaryAlias || item.canonicalName)
   return {
     id: item.id,
-    label: buildDisplayLabel(rawLabel, item.unit),
-    canonicalName: rawLabel,
+    label: buildDisplayLabel(canonicalName, item.unit),
+    canonicalName,
     unit: item.unit,
     aliases: item.aliases ?? [],
     sampleLines: item.sampleLines,
     quantityPriceSamples: item.quantityPriceSamples ?? [],
-    isProviderOnly: isProviderOnly(item.unit, rawLabel),
+    isProviderOnly: isProviderOnly(item.unit, canonicalName),
   }
 }
 
-function toCatalogOptions(industry: ServiceProviderIndustry): ProviderLineItemOption[] {
-  const items = INDUSTRY_CATALOG[industry] ?? INDUSTRY_CATALOG.general
+function toCatalogOptions(industry: string | null | undefined): ProviderLineItemOption[] {
+  const industryMeta = getServiceProviderIndustryMeta(industry)
+  const items = getCatalogLineItemsForIndustry(
+    industryMeta.value,
+    industryMeta.label,
+    industryMeta.categoryId,
+  )
   return items.map((item) => {
     const canonicalName = normalizeLabel(item.name)
     return {
-      id: `catalog_${industry}_${item.key}`,
+      id: `catalog_${industryMeta.categoryId}_${item.key}`,
       label: buildDisplayLabel(canonicalName, item.unit),
       canonicalName,
       unit: item.unit,
@@ -157,20 +139,22 @@ function toCatalogOptions(industry: ServiceProviderIndustry): ProviderLineItemOp
 function dedupeOptions(options: ProviderLineItemOption[]): ProviderLineItemOption[] {
   const grouped = new Map<string, ProviderLineItemOption>()
   options.forEach((option) => {
-    const key = `${normalizeForKey(option.canonicalName)}|${option.unit}`
+    const normalizedName = normalizeForKey(option.canonicalName)
+    const key = findGroupedKey(grouped, normalizedName, option.unit)
     const existing = grouped.get(key)
     if (!existing) {
       grouped.set(key, option)
       return
     }
+
     const aliases = Array.from(new Set([...existing.aliases, ...option.aliases])).filter(Boolean)
-    const mergedSamples = [...existing.quantityPriceSamples, ...option.quantityPriceSamples]
+    const quantityPriceSamples = [...existing.quantityPriceSamples, ...option.quantityPriceSamples]
     const sampleLines = existing.sampleLines + option.sampleLines
     if (option.sampleLines > existing.sampleLines) {
-      grouped.set(key, { ...option, aliases, sampleLines, quantityPriceSamples: mergedSamples })
+      grouped.set(key, { ...option, aliases, sampleLines, quantityPriceSamples })
       return
     }
-    grouped.set(key, { ...existing, aliases, sampleLines, quantityPriceSamples: mergedSamples })
+    grouped.set(key, { ...existing, aliases, sampleLines, quantityPriceSamples })
   })
   return Array.from(grouped.values())
 }
@@ -178,16 +162,17 @@ function dedupeOptions(options: ProviderLineItemOption[]): ProviderLineItemOptio
 export async function listProviderLineItemOptions(
   serviceProviderUid: string,
 ): Promise<ProviderLineItemOption[]> {
-  const learnedItems = await listLearnedPricingItems(serviceProviderUid)
-  if (learnedItems.length > 0) {
-    return dedupeOptions(learnedItems.map(toLearnedOption))
-      .filter((item) => item.canonicalName.length > 0)
-      .sort((left, right) => right.sampleLines - left.sampleLines || left.label.localeCompare(right.label, 'he'))
-  }
+  const [learnedItems, profile] = await Promise.all([
+    listLearnedPricingItems(serviceProviderUid),
+    getServiceProviderByUid(serviceProviderUid),
+  ])
 
-  const profile = await getServiceProviderByUid(serviceProviderUid)
-  const industry = profile?.industry ?? 'general'
-  return dedupeOptions(toCatalogOptions(industry))
+  const merged = dedupeOptions([
+    ...learnedItems.map(toLearnedOption),
+    ...toCatalogOptions(profile?.industry),
+  ])
+
+  return merged
     .filter((item) => item.canonicalName.length > 0)
-    .sort((left, right) => left.label.localeCompare(right.label, 'he'))
+    .sort((left, right) => right.sampleLines - left.sampleLines || left.label.localeCompare(right.label, 'he'))
 }

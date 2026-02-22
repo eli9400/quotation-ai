@@ -1,7 +1,10 @@
 import { Router } from 'express'
 import type { AuthenticatedRequest } from '../middlewares/auth.middleware.js'
 import { requireAuth } from '../middlewares/auth.middleware.js'
-import { isServiceProviderIndustry } from '../services/service-provider-industries.service.js'
+import {
+  isServiceProviderIndustry,
+  listServiceProviderIndustryCategories,
+} from '../services/service-provider-industries.service.js'
 import {
   ensureServiceProviderProfile,
   getServiceProviderByCode,
@@ -13,6 +16,13 @@ export const serviceProvidersRouter = Router()
 type UpdateServiceProviderBody = {
   industry?: unknown
 }
+
+serviceProvidersRouter.get('/service-providers/industries', (_req, res) => {
+  res.status(200).json({
+    ok: true,
+    categories: listServiceProviderIndustryCategories(),
+  })
+})
 
 serviceProvidersRouter.get(['/service-providers/me', '/contractors/me'], requireAuth, async (req, res, next) => {
   try {

@@ -9,6 +9,7 @@ import { providerQuotesRouter } from './routes/provider-quotes.route.js'
 import { quotesRouter } from './routes/quotes.route.js'
 import { serviceProvidersRouter } from './routes/service-providers.route.js'
 import { trainingRouter } from './routes/training.route.js'
+import { vehicleCatalogRouter } from './routes/vehicle-catalog.route.js'
 
 export const app = express()
 
@@ -22,6 +23,7 @@ app.use('/api', trainingRouter)
 app.use('/api', modelRouter)
 app.use('/api', quotesRouter)
 app.use('/api', providerQuotesRouter)
+app.use('/api', vehicleCatalogRouter)
 
 function mapMulterErrorMessage(error: multer.MulterError): string {
   if (error.code === 'LIMIT_FILE_COUNT') {

@@ -31,6 +31,14 @@ type ClientLineItemsResponse = {
     unit: string
   }>
 }
+
+type VehicleCatalogResponse = {
+  ok: boolean
+  items: Array<{
+    value: string
+    label: string
+  }>
+}
 export type ClientExtraRequestedItem = {
   sourceItemId: string | null
   label: string
@@ -42,6 +50,11 @@ export type ClientLineItemOption = {
   sourceItemId: string
   label: string
   unit?: string
+}
+
+export type VehicleCatalogOption = {
+  value: string
+  label: string
 }
 
 function apiUrl(path: string): string {
@@ -130,4 +143,49 @@ export async function submitClientQuoteRevision(
     },
   )
   return mapQuoteRecordPayload(payload.quoteRecord)
+}
+
+export async function fetchVehicleManufacturers(
+  vehicleTypes?: string[],
+): Promise<VehicleCatalogOption[]> {
+  const query = new URLSearchParams()
+  if (Array.isArray(vehicleTypes) && vehicleTypes.length > 0) {
+    query.set('vehicleType', vehicleTypes.join(','))
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : ''
+  const payload = await requestJson<VehicleCatalogResponse>(
+    apiUrl(`/public/vehicle-catalog/manufacturers${suffix}`),
+    { method: 'GET' },
+  )
+  return payload.items ?? []
+}
+
+export async function fetchVehicleModels(
+  make: string,
+  year?: string | number | null,
+): Promise<VehicleCatalogOption[]> {
+  const query = new URLSearchParams({ make: make.trim() })
+  if (year !== undefined && year !== null && String(year).trim().length > 0) {
+    query.set('year', String(year).trim())
+  }
+  const payload = await requestJson<VehicleCatalogResponse>(
+    apiUrl(`/public/vehicle-catalog/models?${query.toString()}`),
+    { method: 'GET' },
+  )
+  return payload.items ?? []
+}
+
+export async function fetchVehicleTrims(
+  make?: string | null,
+): Promise<VehicleCatalogOption[]> {
+  const query = new URLSearchParams()
+  if (typeof make === 'string' && make.trim().length > 0) {
+    query.set('make', make.trim())
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : ''
+  const payload = await requestJson<VehicleCatalogResponse>(
+    apiUrl(`/public/vehicle-catalog/trims${suffix}`),
+    { method: 'GET' },
+  )
+  return payload.items ?? []
 }

@@ -1,6 +1,9 @@
 import type { DecodedIdToken } from 'firebase-admin/auth'
 import { getFirestoreDb } from '../config/firebase.js'
-import { normalizeServiceProviderIndustry } from './service-provider-industries.service.js'
+import {
+  getServiceProviderIndustryMeta,
+  normalizeServiceProviderIndustry,
+} from './service-provider-industries.service.js'
 import type {
   ServiceProviderProfile,
   ServiceProviderPublicProfile,
@@ -95,12 +98,16 @@ function toProfile(
   now: string,
   code: string,
 ): ServiceProviderProfile {
+  const industryMeta = getServiceProviderIndustryMeta(current?.industry)
   return {
     uid,
     serviceProviderCode: code,
     email: authUser.email ?? current?.email ?? '',
     displayName: normalizeDisplayName(authUser, current?.displayName),
-    industry: normalizeServiceProviderIndustry(current?.industry),
+    industry: industryMeta.value,
+    industryLabel: industryMeta.label,
+    industryCategoryId: industryMeta.categoryId,
+    industryCategoryLabel: industryMeta.categoryLabel,
     createdAt: current?.createdAt ?? now,
     updatedAt: now,
     lastLoginAt: now,
@@ -143,6 +150,7 @@ function toPublicProfile(
   if (!code) {
     return null
   }
+  const industryMeta = getServiceProviderIndustryMeta(raw.industry)
 
   return {
     uid: raw.uid ?? docId,
@@ -151,7 +159,10 @@ function toPublicProfile(
       typeof raw.displayName === 'string' && raw.displayName.trim().length > 0
         ? raw.displayName.trim()
         : 'Service provider',
-    industry: normalizeServiceProviderIndustry(raw.industry),
+    industry: industryMeta.value,
+    industryLabel: industryMeta.label,
+    industryCategoryId: industryMeta.categoryId,
+    industryCategoryLabel: industryMeta.categoryLabel,
   }
 }
 
@@ -161,6 +172,7 @@ function toFullProfile(docId: string, raw: RawServiceProviderProfile): ServicePr
     return null
   }
   const now = nowIso()
+  const industryMeta = getServiceProviderIndustryMeta(raw.industry)
   return {
     uid: raw.uid ?? docId,
     serviceProviderCode: code,
@@ -169,7 +181,10 @@ function toFullProfile(docId: string, raw: RawServiceProviderProfile): ServicePr
       typeof raw.displayName === 'string' && raw.displayName.trim().length > 0
         ? raw.displayName.trim()
         : 'Service provider',
-    industry: normalizeServiceProviderIndustry(raw.industry),
+    industry: industryMeta.value,
+    industryLabel: industryMeta.label,
+    industryCategoryId: industryMeta.categoryId,
+    industryCategoryLabel: industryMeta.categoryLabel,
     createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : now,
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : now,
     lastLoginAt: typeof raw.lastLoginAt === 'string' ? raw.lastLoginAt : now,
@@ -229,9 +244,14 @@ export async function setServiceProviderIndustry(
   if (!existing) {
     return null
   }
+  const normalizedIndustry = normalizeServiceProviderIndustry(industry)
+  const industryMeta = getServiceProviderIndustryMeta(normalizedIndustry)
   const nextProfile: ServiceProviderProfile = {
     ...existing,
-    industry: normalizeServiceProviderIndustry(industry),
+    industry: industryMeta.value,
+    industryLabel: industryMeta.label,
+    industryCategoryId: industryMeta.categoryId,
+    industryCategoryLabel: industryMeta.categoryLabel,
     updatedAt: nowIso(),
   }
   const db = getFirestoreDb()
