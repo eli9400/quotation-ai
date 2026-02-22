@@ -9,8 +9,11 @@ import {
 } from 'firebase/auth'
 import { useEffect, useMemo, useState } from 'react'
 import { firebaseAuth } from '../config/firebaseClient'
-import { fetchServiceProviderMe } from '../services/api/serviceProvidersApi'
-import type { ServiceProviderProfile } from '../types/serviceProvider'
+import {
+  fetchServiceProviderMe,
+  updateServiceProviderIndustry,
+} from '../services/api/serviceProvidersApi'
+import type { ServiceProviderIndustry, ServiceProviderProfile } from '../types/serviceProvider'
 
 function getAuthErrorMessage(error: unknown): string {
   if (error instanceof FirebaseError) {
@@ -87,7 +90,12 @@ export function useServiceProviderAuth() {
     }
   }
 
-  const signUp = async (displayName: string, email: string, password: string) => {
+  const signUp = async (
+    displayName: string,
+    email: string,
+    password: string,
+    industry: ServiceProviderIndustry,
+  ) => {
     setErrorMessage(null)
     setIsSigningUp(true)
     try {
@@ -101,7 +109,8 @@ export function useServiceProviderAuth() {
         await updateProfile(credential.user, { displayName: displayName.trim() })
       }
 
-      await credential.user.getIdToken(true)
+      const token = await credential.user.getIdToken(true)
+      await updateServiceProviderIndustry(token, industry)
     } catch (error) {
       setErrorMessage(getAuthErrorMessage(error))
     } finally {

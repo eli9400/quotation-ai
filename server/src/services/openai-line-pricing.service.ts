@@ -18,9 +18,15 @@ export type OpenAiLineCalibrationInput = {
   sourceExamples: Array<{ quantity: number; unitPrice: number }>
 }
 
+export type OpenAiLineAdjustment = {
+  adjustmentPct: number
+  reason: string
+}
+
 type OpenAiRawItem = {
   id?: unknown
-  unitPrice?: unknown
+  adjustmentPct?: unknown
+  reason?: unknown
 }
 
 type OpenAiRawPayload = {
@@ -52,14 +58,36 @@ function toNumber(value: unknown): number | null {
   return null
 }
 
+function toAdjustmentPct(value: unknown): number | null {
+  const parsed = toNumber(value)
+  if (parsed === null) {
+    return null
+  }
+  if (Math.abs(parsed) <= 1) {
+    return parsed
+  }
+  if (Math.abs(parsed) <= 100) {
+    return parsed / 100
+  }
+  return null
+}
+
+function toReason(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
 function buildPrompt(lines: OpenAiLineCalibrationInput[], requirements: string): string {
   return [
-    'Adjust unit prices for line-items using the provided grounded context only.',
+    'Adjust line-items using the provided grounded context only.',
     'Rules:',
-    '- Never ignore currentUnitPrice; it is the grounded base price from historical data.',
+    '- Never replace currentUnitPrice; it is the grounded base price from historical data.',
+    '- Return only a relative adjustment percentage for each line.',
+    '- adjustmentPct is decimal (for example: -0.08 means -8%, 0.12 means +12%).',
+    '- Keep adjustmentPct between -0.15 and 0.15.',
+    '- Keep adjustmentPct conservative. If uncertain, use 0.',
     '- Prefer no change when coverageTier is low.',
     '- For larger quantities, avoid increasing unit price unless strongly justified by context.',
-    '- Output strict JSON only: {"items":[{"id":"...","unitPrice":123.45}]}',
+    '- Output strict JSON only: {"items":[{"id":"...","adjustmentPct":0.04,"reason":"short reason"}]}',
     '- Do not include any extra keys.',
     `Client requirements: ${requirements || 'none'}`,
     `Grounded lines: ${JSON.stringify(lines)}`,
@@ -69,7 +97,7 @@ function buildPrompt(lines: OpenAiLineCalibrationInput[], requirements: string):
 export async function calibrateUnitPricesWithOpenAi(
   lines: OpenAiLineCalibrationInput[],
   requirements: string,
-): Promise<Map<string, number> | null> {
+): Promise<Map<string, OpenAiLineAdjustment> | null> {
   if (!env.openAiApiKey || lines.length === 0) {
     return null
   }
@@ -106,14 +134,17 @@ export async function calibrateUnitPricesWithOpenAi(
   const parsed = toJson<OpenAiRawPayload>(content)
   const items = Array.isArray(parsed?.items) ? parsed.items : []
 
-  const result = new Map<string, number>()
+  const result = new Map<string, OpenAiLineAdjustment>()
   for (const item of items) {
     const id = typeof item.id === 'string' ? item.id : ''
-    const unitPrice = toNumber(item.unitPrice)
-    if (!id || unitPrice === null || unitPrice < 0) {
+    const adjustmentPct = toAdjustmentPct(item.adjustmentPct)
+    if (!id || adjustmentPct === null) {
       continue
     }
-    result.set(id, unitPrice)
+    result.set(id, {
+      adjustmentPct,
+      reason: toReason(item.reason),
+    })
   }
 
   return result.size > 0 ? result : null

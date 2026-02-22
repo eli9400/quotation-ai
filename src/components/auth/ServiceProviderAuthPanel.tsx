@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { ServiceProviderIndustry } from '../../types/serviceProvider'
 import { ClientAccessPanel } from './ClientAccessPanel'
 import { ProviderAuthForm } from './ProviderAuthForm'
 
@@ -6,7 +7,12 @@ type ServiceProviderAuthPanelProps = {
   isSigningIn: boolean
   isSigningUp: boolean
   onSignIn: (email: string, password: string) => Promise<void>
-  onSignUp: (displayName: string, email: string, password: string) => Promise<void>
+  onSignUp: (
+    displayName: string,
+    email: string,
+    password: string,
+    industry: ServiceProviderIndustry,
+  ) => Promise<void>
 }
 
 type EntryRole = 'provider' | 'client'
@@ -14,18 +20,13 @@ type EntryRole = 'provider' | 'client'
 const AUTH_ROLE_STORAGE_KEY = 'quotation-ai-auth-role'
 
 function loadStoredRole(): EntryRole {
-  if (typeof window === 'undefined') {
-    return 'provider'
-  }
-
+  if (typeof window === 'undefined') return 'provider'
   const value = window.localStorage.getItem(AUTH_ROLE_STORAGE_KEY)
   return value === 'client' ? 'client' : 'provider'
 }
 
 function saveRole(role: EntryRole) {
-  if (typeof window === 'undefined') {
-    return
-  }
+  if (typeof window === 'undefined') return
   window.localStorage.setItem(AUTH_ROLE_STORAGE_KEY, role)
 }
 

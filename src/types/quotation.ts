@@ -65,9 +65,10 @@ export type ClientRequestForm = {
   urgency: UrgencyLevel
   requirements: string
   requestedItems?: Array<{
-    sourceItemId: string
+    sourceItemId: string | null
     label: string
     quantity: number
+    unit?: string
   }>
 }
 
@@ -86,7 +87,7 @@ export type TrainingJob = {
 
 export type QuoteSource = 'openai' | 'fallback' | 'learned'
 
-export type QuoteApprovalStatus = 'draft' | 'approved'
+export type QuoteApprovalStatus = 'draft' | 'approved' | 'completed'
 
 export type StoredQuoteRecord = {
   id: string
@@ -94,7 +95,9 @@ export type StoredQuoteRecord = {
   createdAt: string
   updatedAt: string
   status: QuoteApprovalStatus
+  clientRevisionPending: boolean
   approvedAt: string | null
+  completedAt: string | null
   clientRequest: ClientRequestForm
   quote: Quote
 }
@@ -121,4 +124,29 @@ export type FormPreviewSchema = {
   generatedAt: string
   sourceItemsCount: number
   fields: FormPreviewField[]
+}
+
+export type ProviderLineItemOption = {
+  id: string
+  label: string
+  canonicalName: string
+  unit: string
+  aliases: string[]
+  sampleLines: number
+  quantityPriceSamples: Array<{
+    quantity: number
+    unitPrice: number
+  }>
+  isProviderOnly: boolean
+}
+
+export type ProviderCustomFeatureOption = {
+  id: string
+  key: string
+  label: string
+  valueType: 'number' | 'text' | 'boolean'
+  defaultValue: string | number | boolean | null
+  suggestedValue?: string | number | boolean | null
+  suggestedSampleCount?: number
+  showInQuoteDetails: boolean
 }

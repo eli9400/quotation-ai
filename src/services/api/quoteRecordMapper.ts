@@ -5,8 +5,10 @@ export type QuoteRecordPayload = {
   source: QuoteSource
   createdAt: string
   updatedAt?: string
-  status?: 'draft' | 'approved'
+  status?: 'draft' | 'approved' | 'completed'
+  clientRevisionPending?: boolean
   approvedAt?: string | null
+  completedAt?: string | null
   clientRequest: ClientRequestForm
   quote: Quote
 }
@@ -101,10 +103,20 @@ export function mapQuoteRecordPayload(payload: QuoteRecordPayload): StoredQuoteR
     source: payload.source,
     createdAt: payload.createdAt,
     updatedAt: payload.updatedAt ?? payload.createdAt,
-    status: payload.status === 'approved' ? 'approved' : 'draft',
+    status:
+      payload.status === 'completed'
+        ? 'completed'
+        : payload.status === 'approved'
+          ? 'approved'
+          : 'draft',
+    clientRevisionPending: payload.clientRevisionPending === true,
     approvedAt:
       typeof payload.approvedAt === 'string' && payload.approvedAt.length > 0
         ? payload.approvedAt
+        : null,
+    completedAt:
+      typeof payload.completedAt === 'string' && payload.completedAt.length > 0
+        ? payload.completedAt
         : null,
     clientRequest,
     quote: {

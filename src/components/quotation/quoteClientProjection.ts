@@ -3,6 +3,7 @@ import {
   computeCustomFieldsAdjustment,
   isPercentLikeCustomField,
 } from './quoteCustomFieldMath'
+import { computeLineTotals, isPercentLineUnit } from './quoteLineMath'
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100
@@ -27,11 +28,14 @@ function hiddenPercentAdjustment(quote: Quote): number {
 }
 
 function projectLineWithFactor(line: QuoteLineItem, factor: number): QuoteLineItem {
+  if (isPercentLineUnit(line.unit)) {
+    return { ...line }
+  }
   const unitPrice = round2(line.unitPrice * factor)
   return {
     ...line,
     unitPrice,
-    lineTotal: round2(unitPrice * line.quantity),
+    lineTotal: line.lineTotal,
   }
 }
 
@@ -48,8 +52,19 @@ export type ClientProjectedQuote = {
 export function toClientProjectedQuote(quote: Quote): ClientProjectedQuote {
   const hiddenPercent = hiddenPercentAdjustment(quote)
   const factor = Math.max(0, 1 + hiddenPercent / 100)
-  const lineItems =
-    factor === 1 ? quote.lineItems : quote.lineItems.map((line) => projectLineWithFactor(line, factor))
+  const projectedLines =
+    factor === 1 ? quote.lineItems.map((line) => ({ ...line })) : quote.lineItems.map((line) => projectLineWithFactor(line, factor))
+  const lineTotals = computeLineTotals(
+    projectedLines.map((line) => ({
+      quantity: line.quantity,
+      unitPrice: line.unitPrice,
+      unit: line.unit,
+    })),
+  )
+  const lineItems = projectedLines.map((line, index) => ({
+    ...line,
+    lineTotal: lineTotals[index] ?? 0,
+  }))
   const lineSubtotal = round2(lineItems.reduce((sum, line) => sum + line.lineTotal, 0))
   const visibleFields = quote.customFields.filter((field) => field.showInQuoteDetails)
   const visibleAdjustment = round2(computeCustomFieldsAdjustment(visibleFields, lineSubtotal))

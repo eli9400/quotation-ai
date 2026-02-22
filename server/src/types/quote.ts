@@ -18,9 +18,10 @@ export type QuoteClientRequest = {
 }
 
 export type QuoteRequestedItem = {
-  sourceItemId: string
+  sourceItemId: string | null
   label: string
   quantity: number
+  unit?: PricingUnit | 'custom'
 }
 
 export type QuoteLineItem = {
@@ -70,7 +71,7 @@ export type GeneratedQuote = {
 
 export type QuoteSource = 'openai' | 'fallback' | 'learned'
 
-export type QuoteApprovalStatus = 'draft' | 'approved'
+export type QuoteApprovalStatus = 'draft' | 'approved' | 'completed'
 
 export type StoredQuote = {
   id: string
@@ -83,5 +84,7 @@ export type StoredQuote = {
   createdAt: string
   updatedAt: string
   approvedAt: string | null
+  completedAt: string | null
   approvedByServiceProviderUid: string | null
+  clientRevisionPending: boolean
 }

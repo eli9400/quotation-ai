@@ -2,6 +2,8 @@ import { env } from '../../config/env'
 import type {
   ClientRequestForm,
   FormPreviewSchema,
+  ProviderCustomFeatureOption,
+  ProviderLineItemOption,
   Quote,
   QuoteSource,
   StoredQuoteRecord,
@@ -57,6 +59,14 @@ type ListQuotesResponse = {
 type FormPreviewResponse = {
   ok: boolean
   schema: FormPreviewSchema
+}
+type ProviderLineItemsResponse = {
+  ok: boolean
+  items: ProviderLineItemOption[]
+}
+type ProviderCustomFeaturesResponse = {
+  ok: boolean
+  features: ProviderCustomFeatureOption[]
 }
 
 function apiUrl(path: string): string {
@@ -172,7 +182,9 @@ export async function generateQuote(
       createdAt: payload.quote.generatedAt,
       updatedAt: payload.quote.generatedAt,
       status: 'draft',
+      clientRevisionPending: false,
       approvedAt: null,
+      completedAt: null,
       clientRequest,
       quote: payload.quote,
     }),
@@ -193,4 +205,30 @@ export async function getFormPreviewSchema(idToken: string): Promise<FormPreview
     headers: authHeaders(idToken),
   })
   return payload.schema
+}
+
+export async function getProviderLineItemOptions(
+  idToken: string,
+): Promise<ProviderLineItemOption[]> {
+  const payload = await requestJson<ProviderLineItemsResponse>(
+    apiUrl('/model/provider-line-items'),
+    {
+      method: 'GET',
+      headers: authHeaders(idToken),
+    },
+  )
+  return payload.items
+}
+
+export async function getProviderCustomFeatureOptions(
+  idToken: string,
+): Promise<ProviderCustomFeatureOption[]> {
+  const payload = await requestJson<ProviderCustomFeaturesResponse>(
+    apiUrl('/model/custom-features'),
+    {
+      method: 'GET',
+      headers: authHeaders(idToken),
+    },
+  )
+  return payload.features
 }

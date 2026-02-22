@@ -1,5 +1,6 @@
 import type { DecodedIdToken } from 'firebase-admin/auth'
 import { getFirestoreDb } from '../config/firebase.js'
+import { normalizeServiceProviderIndustry } from './service-provider-industries.service.js'
 import type {
   ServiceProviderProfile,
   ServiceProviderPublicProfile,
@@ -99,6 +100,7 @@ function toProfile(
     serviceProviderCode: code,
     email: authUser.email ?? current?.email ?? '',
     displayName: normalizeDisplayName(authUser, current?.displayName),
+    industry: normalizeServiceProviderIndustry(current?.industry),
     createdAt: current?.createdAt ?? now,
     updatedAt: now,
     lastLoginAt: now,
@@ -149,6 +151,28 @@ function toPublicProfile(
       typeof raw.displayName === 'string' && raw.displayName.trim().length > 0
         ? raw.displayName.trim()
         : 'Service provider',
+    industry: normalizeServiceProviderIndustry(raw.industry),
+  }
+}
+
+function toFullProfile(docId: string, raw: RawServiceProviderProfile): ServiceProviderProfile | null {
+  const code = getExistingCode(raw)
+  if (!code) {
+    return null
+  }
+  const now = nowIso()
+  return {
+    uid: raw.uid ?? docId,
+    serviceProviderCode: code,
+    email: typeof raw.email === 'string' ? raw.email : '',
+    displayName:
+      typeof raw.displayName === 'string' && raw.displayName.trim().length > 0
+        ? raw.displayName.trim()
+        : 'Service provider',
+    industry: normalizeServiceProviderIndustry(raw.industry),
+    createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : now,
+    updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : now,
+    lastLoginAt: typeof raw.lastLoginAt === 'string' ? raw.lastLoginAt : now,
   }
 }
 
@@ -186,4 +210,31 @@ export async function getServiceProviderByCode(
       serviceProviderCode,
     ))
   )
+}
+
+export async function getServiceProviderByUid(uid: string): Promise<ServiceProviderProfile | null> {
+  const db = getFirestoreDb()
+  const snapshot = await db.collection(SERVICE_PROVIDERS_COLLECTION).doc(uid).get()
+  if (!snapshot.exists) {
+    return null
+  }
+  return toFullProfile(snapshot.id, snapshot.data() as RawServiceProviderProfile)
+}
+
+export async function setServiceProviderIndustry(
+  uid: string,
+  industry: ServiceProviderProfile['industry'],
+): Promise<ServiceProviderProfile | null> {
+  const existing = await getServiceProviderByUid(uid)
+  if (!existing) {
+    return null
+  }
+  const nextProfile: ServiceProviderProfile = {
+    ...existing,
+    industry: normalizeServiceProviderIndustry(industry),
+    updatedAt: nowIso(),
+  }
+  const db = getFirestoreDb()
+  await db.collection(SERVICE_PROVIDERS_COLLECTION).doc(uid).set(nextProfile, { merge: true })
+  return nextProfile
 }

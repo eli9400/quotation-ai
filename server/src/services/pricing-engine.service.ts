@@ -168,9 +168,18 @@ export async function buildGroundedPricingLines(input: {
   const lines: GroundedPricingLine[] = []
 
   input.requestedItems.forEach((requested, index) => {
-    const item = learnedById.get(requested.sourceItemId)
-    if (!item || requested.quantity <= 0) {
-      skippedSourceItemIds.push(requested.sourceItemId)
+    const sourceItemId =
+      typeof requested.sourceItemId === 'string' && requested.sourceItemId.trim().length > 0
+        ? requested.sourceItemId
+        : null
+    if (!sourceItemId || requested.quantity <= 0) {
+      skippedSourceItemIds.push(sourceItemId ?? requested.label)
+      return
+    }
+
+    const item = learnedById.get(sourceItemId)
+    if (!item) {
+      skippedSourceItemIds.push(sourceItemId)
       return
     }
 

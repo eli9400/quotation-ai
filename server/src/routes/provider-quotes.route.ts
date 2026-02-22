@@ -5,7 +5,9 @@ import { requireAuth } from '../middlewares/auth.middleware.js'
 import { buildQuoteFromLineItems } from '../services/quote-breakdown.service.js'
 import {
   approveQuoteForServiceProvider,
+  completeQuoteForServiceProvider,
   deleteQuoteForServiceProvider,
+  getQuoteById,
   updateQuoteForServiceProvider,
 } from '../services/quotes.service.js'
 import type { GeneratedQuote, QuoteLineItem } from '../types/quote.js'
@@ -107,6 +109,19 @@ providerQuotesRouter.patch('/quotes/:quoteId', requireAuth, async (req, res, nex
       return
     }
 
+    const existing = await getQuoteById(quoteId)
+    if (!existing || existing.serviceProviderUid !== authReq.authUser.uid) {
+      res.status(404).json({ ok: false, message: 'Quote not found.' })
+      return
+    }
+    if (existing.status !== 'draft') {
+      res.status(409).json({
+        ok: false,
+        message: 'Approved or completed quotes are read-only for service provider.',
+      })
+      return
+    }
+
     const updated = await updateQuoteForServiceProvider(quoteId, authReq.authUser.uid, quote)
     if (!updated) {
       res.status(404).json({ ok: false, message: 'Quote not found.' })
@@ -140,12 +155,48 @@ providerQuotesRouter.post('/quotes/:quoteId/approve', requireAuth, async (req, r
   }
 })
 
+providerQuotesRouter.post('/quotes/:quoteId/complete', requireAuth, async (req, res, next) => {
+  try {
+    const authReq = req as AuthenticatedRequest
+    const quoteId = parseParamValue(req.params.quoteId)
+    if (!quoteId) {
+      res.status(400).json({ ok: false, message: 'quoteId is required.' })
+      return
+    }
+
+    const existing = await getQuoteById(quoteId)
+    if (!existing || existing.serviceProviderUid !== authReq.authUser.uid) {
+      res.status(404).json({ ok: false, message: 'Quote not found.' })
+      return
+    }
+    if (existing.status === 'draft') {
+      res.status(409).json({ ok: false, message: 'Only approved quotes can be marked as completed.' })
+      return
+    }
+    const completed = await completeQuoteForServiceProvider(quoteId, authReq.authUser.uid)
+    if (!completed) {
+      res.status(404).json({ ok: false, message: 'Quote not found.' })
+      return
+    }
+
+    res.status(200).json({ ok: true, quoteRecord: completed })
+  } catch (error) {
+    next(error)
+  }
+})
+
 providerQuotesRouter.delete('/quotes/:quoteId', requireAuth, async (req, res, next) => {
   try {
     const authReq = req as AuthenticatedRequest
     const quoteId = parseParamValue(req.params.quoteId)
     if (!quoteId) {
       res.status(400).json({ ok: false, message: 'quoteId is required.' })
+      return
+    }
+
+    const existing = await getQuoteById(quoteId)
+    if (existing && existing.serviceProviderUid === authReq.authUser.uid && existing.status !== 'draft') {
+      res.status(409).json({ ok: false, message: 'Approved or completed quotes cannot be deleted.' })
       return
     }
 

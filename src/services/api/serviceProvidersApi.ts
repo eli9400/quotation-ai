@@ -1,5 +1,6 @@
 import { env } from '../../config/env'
 import type {
+  ServiceProviderIndustry,
   ServiceProviderProfile,
   ServiceProviderPublicProfile,
 } from '../../types/serviceProvider'
@@ -17,6 +18,12 @@ type GetServiceProviderByCodeResponse = {
   contractor?: ServiceProviderPublicProfile
 }
 
+type UpdateServiceProviderResponse = {
+  ok: boolean
+  serviceProvider?: ServiceProviderProfile
+  contractor?: ServiceProviderProfile
+}
+
 function apiUrl(path: string): string {
   return `${env.apiBaseUrl}${path}`
 }
@@ -24,16 +31,12 @@ function apiUrl(path: string): string {
 export async function fetchServiceProviderMe(idToken: string): Promise<ServiceProviderProfile> {
   const payload = await requestJson<GetServiceProviderMeResponse>(apiUrl('/service-providers/me'), {
     method: 'GET',
-    headers: {
-      Authorization: `Bearer ${idToken}`,
-    },
+    headers: { Authorization: `Bearer ${idToken}` },
   })
-
   const profile = payload.serviceProvider ?? payload.contractor
   if (!profile) {
     throw new Error('Service provider profile is missing from API response.')
   }
-
   return profile
 }
 
@@ -42,15 +45,30 @@ export async function fetchServiceProviderByCode(
 ): Promise<ServiceProviderPublicProfile> {
   const payload = await requestJson<GetServiceProviderByCodeResponse>(
     apiUrl(`/service-providers/by-code/${encodeURIComponent(serviceProviderCode.trim().toUpperCase())}`),
-    {
-      method: 'GET',
-    },
+    { method: 'GET' },
   )
-
   const profile = payload.serviceProvider ?? payload.contractor
   if (!profile) {
     throw new Error('נותן שירות לא נמצא עבור הקוד שסופק.')
   }
+  return profile
+}
 
+export async function updateServiceProviderIndustry(
+  idToken: string,
+  industry: ServiceProviderIndustry,
+): Promise<ServiceProviderProfile> {
+  const payload = await requestJson<UpdateServiceProviderResponse>(apiUrl('/service-providers/me'), {
+    method: 'PATCH',
+    body: JSON.stringify({ industry }),
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+      'Content-Type': 'application/json',
+    },
+  })
+  const profile = payload.serviceProvider ?? payload.contractor
+  if (!profile) {
+    throw new Error('Service provider profile is missing from API response.')
+  }
   return profile
 }

@@ -33,21 +33,17 @@ export function useQuoteHistory({
       setIsLoadingQuotes(true)
       try {
         const records = await listQuotes(authToken)
-        if (isActive) {
-          setQuoteHistory(records)
-        }
+        if (isActive) setQuoteHistory(records)
       } catch (error) {
         if (isActive) {
           const message =
             error instanceof Error && error.message.trim().length > 0
               ? error.message
-              : 'טעינת הצעות נכשלה.'
+              : 'טעינת ההצעות נכשלה.'
           onError(message)
         }
       } finally {
-        if (isActive) {
-          setIsLoadingQuotes(false)
-        }
+        if (isActive) setIsLoadingQuotes(false)
       }
     }
 
@@ -66,10 +62,5 @@ export function useQuoteHistory({
     setIsLoadingQuotes(false)
   }, [])
 
-  return {
-    quoteHistory,
-    isLoadingQuotes,
-    appendQuoteRecord,
-    clearQuoteHistory,
-  }
+  return { quoteHistory, isLoadingQuotes, appendQuoteRecord, clearQuoteHistory }
 }

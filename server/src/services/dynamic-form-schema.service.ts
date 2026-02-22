@@ -14,9 +14,9 @@ import type {
 const MAX_DYNAMIC_FIELDS = Math.max(5, Math.min(120, env.clientFormMaxItems))
 const MIN_SAMPLES_PER_CLIENT_FIELD = 1
 const CLIENT_FIELD_IGNORE_PATTERNS = [
-  /מע.?מ/i,
+  /מע["״׳]?מ/i,
   /vat/i,
-  /סה.?כ/i,
+  /סה["״׳]?כ/i,
   /total/i,
   /subtotal/i,
   /תנאי תשלום/i,
@@ -122,23 +122,17 @@ function titleFromItem(item: LearnedPricingItem): string {
 }
 
 function isClientUnitAllowed(unit: PricingUnit): boolean {
-  return unit !== 'unknown' && unit !== 'percent' && unit !== 'fixed'
+  return unit !== 'unknown' && unit !== 'percent' && unit !== 'fixed' && unit !== 'day'
 }
 
 function isClientSafeItem(item: LearnedPricingItem): boolean {
-  if (item.sampleLines < MIN_SAMPLES_PER_CLIENT_FIELD) {
-    return false
-  }
+  if (item.sampleLines < MIN_SAMPLES_PER_CLIENT_FIELD) return false
 
   const normalizedUnit = resolveClientUnit(item)
-  if (!isClientUnitAllowed(normalizedUnit)) {
-    return false
-  }
+  if (!isClientUnitAllowed(normalizedUnit)) return false
 
   const label = titleFromItem(item)
-  if (!label || label.length > 90) {
-    return false
-  }
+  if (!label || label.length > 90) return false
   return !CLIENT_FIELD_IGNORE_PATTERNS.some((pattern) => pattern.test(label))
 }
 
@@ -169,9 +163,7 @@ function dedupeItemsForClient(items: LearnedPricingItem[]): LearnedPricingItem[]
   })
 
   return Array.from(grouped.values()).sort((a, b) => {
-    if (b.sampleLines !== a.sampleLines) {
-      return b.sampleLines - a.sampleLines
-    }
+    if (b.sampleLines !== a.sampleLines) return b.sampleLines - a.sampleLines
     return b.lastUpdatedAt.localeCompare(a.lastUpdatedAt)
   })
 }
@@ -225,10 +217,7 @@ export async function buildDynamicFormSchema(
   )
   const fields = baseFields()
   const startOrder = fields.length + 1
-
-  selectedItems.forEach((item, index) => {
-    fields.push(toNumberField(item, startOrder + index))
-  })
+  selectedItems.forEach((item, index) => fields.push(toNumberField(item, startOrder + index)))
 
   const schema: DynamicFormSchema = {
     id: serviceProviderUid,

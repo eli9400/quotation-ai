@@ -1,9 +1,6 @@
 import type { Quote, QuoteCustomField, QuoteLineItem, StoredQuoteRecord } from '../../types/quotation'
 import type { EditableCustomField } from './QuoteCustomFieldsEditor'
-import {
-  computeCustomFieldsAdjustment,
-  isPercentLikeCustomField,
-} from './quoteCustomFieldMath'
+import { computeCustomFieldsAdjustment, isPercentLikeCustomField } from './quoteCustomFieldMath'
 import { computeLineTotals, isPercentLineUnit } from './quoteLineMath'
 
 export type EditableLineItem = {
@@ -13,6 +10,7 @@ export type EditableLineItem = {
   unit: string
   quantity: string
   unitPrice: string
+  autoPriced: boolean
 }
 
 export type EditableQuoteState = {
@@ -37,6 +35,7 @@ export function toEditableState(record: StoredQuoteRecord): EditableQuoteState {
       unit: item.unit,
       quantity: String(item.quantity),
       unitPrice: String(item.unitPrice),
+      autoPriced: false,
     })),
     customFields: record.quote.customFields.map((field) => ({
       id: field.id,
@@ -64,10 +63,6 @@ function toNumber(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-export function computeLineTotal(quantity: number, unitPrice: number): number {
-  return computeLineTotals([{ quantity, unitPrice, unit: 'custom' }])[0] ?? 0
-}
-
 export function applyCpiFactorToLineItems(
   lineItems: EditableLineItem[],
   ratio: number,
@@ -76,6 +71,9 @@ export function applyCpiFactorToLineItems(
     return lineItems
   }
   return lineItems.map((line) => {
+    if (!line.sourceItemId || isPercentLineUnit(line.unit)) {
+      return line
+    }
     const value = Number(line.unitPrice)
     const next = Number.isFinite(value) ? value * ratio : 0
     return { ...line, unitPrice: String(Math.round(next * 10_000) / 10_000) }
@@ -134,8 +132,8 @@ function parseCustomFieldValue(field: EditableCustomField): QuoteCustomField['va
   }
   if (field.valueType === 'boolean') {
     const normalized = field.value.trim().toLowerCase()
-    if (normalized === 'true') return true
-    if (normalized === 'false') return false
+    if (normalized === 'true' || normalized === 'yes' || normalized === 'כן') return true
+    if (normalized === 'false' || normalized === 'no' || normalized === 'לא') return false
     return null
   }
   return field.value.trim()

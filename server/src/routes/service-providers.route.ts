@@ -1,12 +1,18 @@
 import { Router } from 'express'
 import type { AuthenticatedRequest } from '../middlewares/auth.middleware.js'
 import { requireAuth } from '../middlewares/auth.middleware.js'
+import { isServiceProviderIndustry } from '../services/service-provider-industries.service.js'
 import {
   ensureServiceProviderProfile,
   getServiceProviderByCode,
+  setServiceProviderIndustry,
 } from '../services/service-providers.service.js'
 
 export const serviceProvidersRouter = Router()
+
+type UpdateServiceProviderBody = {
+  industry?: unknown
+}
 
 serviceProvidersRouter.get(['/service-providers/me', '/contractors/me'], requireAuth, async (req, res, next) => {
   try {
@@ -17,6 +23,27 @@ serviceProvidersRouter.get(['/service-providers/me', '/contractors/me'], require
       serviceProvider,
       contractor: serviceProvider,
     })
+  } catch (error) {
+    next(error)
+  }
+})
+
+serviceProvidersRouter.patch('/service-providers/me', requireAuth, async (req, res, next) => {
+  try {
+    const authReq = req as AuthenticatedRequest
+    const body = req.body as UpdateServiceProviderBody
+    if (!isServiceProviderIndustry(body.industry)) {
+      res.status(400).json({ ok: false, message: 'industry is required and invalid.' })
+      return
+    }
+
+    const updated = await setServiceProviderIndustry(authReq.authUser.uid, body.industry)
+    if (!updated) {
+      res.status(404).json({ ok: false, message: 'Service provider not found.' })
+      return
+    }
+
+    res.status(200).json({ ok: true, serviceProvider: updated, contractor: updated })
   } catch (error) {
     next(error)
   }

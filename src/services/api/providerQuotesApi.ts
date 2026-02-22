@@ -54,6 +54,20 @@ export async function approveQuoteRecord(
   return mapQuoteRecordPayload(payload.quoteRecord)
 }
 
+export async function completeQuoteRecord(
+  idToken: string,
+  quoteId: string,
+): Promise<StoredQuoteRecord> {
+  const payload = await requestJson<UpdateQuoteResponse>(
+    apiUrl(`/quotes/${encodeURIComponent(quoteId)}/complete`),
+    {
+      method: 'POST',
+      headers: authHeaders(idToken),
+    },
+  )
+  return mapQuoteRecordPayload(payload.quoteRecord)
+}
+
 export async function deleteQuoteRecord(
   idToken: string,
   quoteId: string,

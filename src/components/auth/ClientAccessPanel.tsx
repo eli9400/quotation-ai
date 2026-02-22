@@ -1,33 +1,27 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { fetchClientFormSchema, submitClientQuoteRequest } from '../../services/api/clientPortalApi'
+import {
+  fetchClientFormSchema,
+  fetchClientLineItemOptions,
+  listClientQuotes,
+  submitClientQuoteRequest,
+  submitClientQuoteRevision,
+  type ClientExtraRequestedItem,
+  type ClientLineItemOption,
+} from '../../services/api/clientPortalApi'
 import { fetchServiceProviderByCode } from '../../services/api/serviceProvidersApi'
-import type { FormPreviewSchema } from '../../types/quotation'
+import type { FormPreviewSchema, Quote, StoredQuoteRecord } from '../../types/quotation'
 import type { ServiceProviderPublicProfile } from '../../types/serviceProvider'
 import { PrimaryButton } from '../ui/PrimaryButton'
+import { ClientQuotesPanel } from './ClientQuotesPanel'
+import { ClientRequestedItemsEditor } from './ClientRequestedItemsEditor'
+import {
+  asErrorMessage,
+  createInitialFormValues,
+  fieldSort,
+  shouldRenderField,
+} from './clientAccessHelpers'
 
-type ClientStage = 'lookup' | 'form' | 'submitted'
-
-function isClientVisibleField(field: FormPreviewSchema['fields'][number]): boolean {
-  return !field.visibleTo || field.visibleTo === 'client'
-}
-
-function initialFieldValue(field: FormPreviewSchema['fields'][number]): string {
-  return field.type === 'number' ? '0' : ''
-}
-
-function createInitialFormValues(
-  schema: FormPreviewSchema,
-  clientName: string,
-  clientEmail: string,
-): Record<string, string> {
-  const values: Record<string, string> = {}
-  schema.fields.filter(isClientVisibleField).forEach((field) => {
-    values[field.id] = initialFieldValue(field)
-  })
-  values.clientName = clientName
-  values.clientEmail = clientEmail
-  return values
-}
+type ClientStage = 'lookup' | 'form'
 
 export function ClientAccessPanel() {
   const [stage, setStage] = useState<ClientStage>('lookup')
@@ -37,119 +31,128 @@ export function ClientAccessPanel() {
   const [serviceProvider, setServiceProvider] = useState<ServiceProviderPublicProfile | null>(null)
   const [schema, setSchema] = useState<FormPreviewSchema | null>(null)
   const [formValues, setFormValues] = useState<Record<string, string>>({})
-  const [createdRequestId, setCreatedRequestId] = useState<string | null>(null)
+  const [clientItemOptions, setClientItemOptions] = useState<ClientLineItemOption[]>([])
+  const [extraRequestedItems, setExtraRequestedItems] = useState<ClientExtraRequestedItem[]>([])
+  const [quoteRecords, setQuoteRecords] = useState<StoredQuoteRecord[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingQuotes, setIsLoadingQuotes] = useState(false)
+  const [isSubmittingRevision, setIsSubmittingRevision] = useState(false)
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const canLookup = useMemo(() => {
-    const hasEmail = clientEmail.trim().includes('@')
-    return serviceCode.trim().length >= 4 && clientName.trim().length > 1 && hasEmail
-  }, [clientEmail, clientName, serviceCode])
+  const canLookup = useMemo(
+    () =>
+      serviceCode.trim().length >= 4 &&
+      clientName.trim().length > 1 &&
+      clientEmail.trim().includes('@'),
+    [clientEmail, clientName, serviceCode],
+  )
+
+  const loadClientQuotes = async (code: string, email: string) => {
+    setIsLoadingQuotes(true)
+    try {
+      setQuoteRecords(await listClientQuotes(code, email))
+    } finally {
+      setIsLoadingQuotes(false)
+    }
+  }
+
+  const refreshClientQuotes = async (code: string, email: string) => {
+    try {
+      await loadClientQuotes(code, email)
+    } catch (error) {
+      setErrorMessage(asErrorMessage(error, 'טעינת רשימת ההצעות ללקוח נכשלה.'))
+    }
+  }
 
   const handleLookupSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!canLookup || isLoading) {
-      return
-    }
-
+    if (!canLookup || isLoading) return
     setErrorMessage(null)
+    setStatusMessage(null)
     setIsLoading(true)
     try {
       const normalizedCode = serviceCode.trim().toUpperCase()
-      const [provider, nextSchema] = await Promise.all([
+      const normalizedName = clientName.trim()
+      const normalizedEmail = clientEmail.trim().toLowerCase()
+      const [provider, nextSchema, nextOptions] = await Promise.all([
         fetchServiceProviderByCode(normalizedCode),
         fetchClientFormSchema(normalizedCode),
+        fetchClientLineItemOptions(normalizedCode),
       ])
-
       setServiceCode(normalizedCode)
+      setClientName(normalizedName)
+      setClientEmail(normalizedEmail)
       setServiceProvider(provider)
       setSchema(nextSchema)
-      setFormValues(createInitialFormValues(nextSchema, clientName.trim(), clientEmail.trim()))
+      setClientItemOptions(nextOptions)
+      setFormValues(createInitialFormValues(nextSchema, normalizedName, normalizedEmail))
+      setExtraRequestedItems([])
       setStage('form')
+      await refreshClientQuotes(normalizedCode, normalizedEmail)
     } catch (error) {
-      const message =
-        error instanceof Error && error.message.trim().length > 0
-          ? error.message
-          : 'טעינת טופס לקוח נכשלה.'
-      setErrorMessage(message)
+      setErrorMessage(asErrorMessage(error, 'טעינת טופס לקוח נכשלה.'))
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleFieldChange = (fieldId: string, value: string) => {
+  const handleFieldChange = (fieldId: string, value: string) =>
     setFormValues((current) => ({ ...current, [fieldId]: value }))
-  }
 
   const handleFormReset = () => {
-    if (!schema) {
-      return
-    }
+    if (!schema) return
     setFormValues(createInitialFormValues(schema, clientName.trim(), clientEmail.trim()))
+    setExtraRequestedItems([])
     setErrorMessage(null)
+    setStatusMessage(null)
   }
 
   const handleFormSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!schema || isLoading) {
-      return
-    }
-
+    if (!schema || isLoading) return
     setErrorMessage(null)
+    setStatusMessage(null)
     setIsLoading(true)
     try {
-      const requestId = await submitClientQuoteRequest(serviceCode, formValues)
-      setCreatedRequestId(requestId)
-      setStage('submitted')
+      const requestId = await submitClientQuoteRequest(serviceCode, formValues, extraRequestedItems)
+      setStatusMessage(`הבקשה נשלחה לנותן השירות. מספר מעקב: ${requestId}`)
+      await refreshClientQuotes(serviceCode, clientEmail)
     } catch (error) {
-      const message =
-        error instanceof Error && error.message.trim().length > 0
-          ? error.message
-          : 'שליחת בקשת לקוח נכשלה.'
-      setErrorMessage(message)
+      setErrorMessage(asErrorMessage(error, 'שליחת בקשת לקוח נכשלה.'))
     } finally {
       setIsLoading(false)
     }
   }
 
-  if (stage === 'submitted') {
-    return (
-      <>
-        <h2>הבקשה נשלחה</h2>
-        <p>
-          הבקשה שלך נשלחה לנותן השירות לבדיקה ואישור. מספר מעקב: <strong>{createdRequestId}</strong>
-        </p>
-        <PrimaryButton
-          type="button"
-          disabled={isLoading}
-          onClick={() => {
-            setStage('lookup')
-            setSchema(null)
-            setServiceProvider(null)
-            setFormValues({})
-            setCreatedRequestId(null)
-            setErrorMessage(null)
-          }}
-        >
-          שליחת בקשה חדשה
-        </PrimaryButton>
-      </>
-    )
+  const handleSubmitRevision = async (quoteId: string, quote: Quote) => {
+    setErrorMessage(null)
+    setStatusMessage(null)
+    setIsSubmittingRevision(true)
+    try {
+      const updated = await submitClientQuoteRevision(serviceCode, clientEmail, quoteId, quote)
+      setQuoteRecords((current) =>
+        current.map((record) => (record.id === updated.id ? updated : record)),
+      )
+      setStatusMessage('הגרסה המעודכנת נשלחה לאישור נותן השירות.')
+    } catch (error) {
+      setErrorMessage(asErrorMessage(error, 'שליחת עדכון לנותן השירות נכשלה.'))
+    } finally {
+      setIsSubmittingRevision(false)
+    }
   }
 
   if (stage === 'form' && schema && serviceProvider) {
-    const orderedFields = schema.fields
-      .filter(isClientVisibleField)
-      .slice()
-      .sort((a, b) => a.order - b.order)
-
+    const orderedFields = schema.fields.filter(shouldRenderField).slice().sort(fieldSort)
     return (
       <>
         <h2>טופס בקשת לקוח</h2>
         <p>
           נותן שירות: <strong>{serviceProvider.displayName}</strong> ({serviceProvider.serviceProviderCode})
         </p>
-
+        <p className="quote-cpi-caption">
+          פרטי לקוח מזוהים אוטומטית: {clientName} | {clientEmail}
+        </p>
         <form className="auth-form client-form" onSubmit={handleFormSubmit}>
           <div className="client-form-fields">
             {orderedFields.map((field) => (
@@ -164,16 +167,9 @@ export function ClientAccessPanel() {
                     placeholder={field.placeholder ?? ''}
                   />
                 ) : field.type === 'select' ? (
-                  <select
-                    value={formValues[field.id] ?? ''}
-                    onChange={(event) => handleFieldChange(field.id, event.target.value)}
-                  >
+                  <select value={formValues[field.id] ?? ''} onChange={(event) => handleFieldChange(field.id, event.target.value)}>
                     <option value="">בחרו</option>
-                    {field.options.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
+                    {field.options.map((option) => <option key={option} value={option}>{option}</option>)}
                   </select>
                 ) : (
                   <input
@@ -188,16 +184,28 @@ export function ClientAccessPanel() {
             ))}
           </div>
 
+          <ClientRequestedItemsEditor
+            options={clientItemOptions}
+            items={extraRequestedItems}
+            disabled={isLoading}
+            onChange={setExtraRequestedItems}
+          />
+
           <div className="auth-actions-row">
-            <PrimaryButton type="button" disabled={isLoading} onClick={handleFormReset}>
-              ניקוי טופס
-            </PrimaryButton>
-            <PrimaryButton type="submit" disabled={isLoading}>
-              {isLoading ? 'שולח בקשה...' : 'שלח בקשה להצעת מחיר'}
-            </PrimaryButton>
+            <PrimaryButton type="button" disabled={isLoading} onClick={handleFormReset}>ניקוי טופס</PrimaryButton>
+            <PrimaryButton type="submit" disabled={isLoading}>{isLoading ? 'שולח בקשה...' : 'שלח בקשה להצעת מחיר'}</PrimaryButton>
           </div>
         </form>
 
+        <ClientQuotesPanel
+          records={quoteRecords}
+          isLoading={isLoadingQuotes}
+          isSubmittingRevision={isSubmittingRevision}
+          onRefresh={() => refreshClientQuotes(serviceCode, clientEmail)}
+          onSubmitRevision={handleSubmitRevision}
+        />
+
+        {statusMessage ? <p className="auth-status auth-status-success">{statusMessage}</p> : null}
         {errorMessage ? <p className="auth-status auth-status-error">{errorMessage}</p> : null}
       </>
     )
@@ -206,43 +214,16 @@ export function ClientAccessPanel() {
   return (
     <>
       <h2>כניסת לקוח</h2>
-      <p>מלאו קוד נותן שירות ופרטי קשר כדי להמשיך לטופס הבקשה הדינמי.</p>
-
+      <p>מלאו קוד נותן שירות ופרטי קשר כדי להמשיך לטופס הדינמי.</p>
       <form className="auth-form" onSubmit={handleLookupSubmit}>
         <label htmlFor="clientServiceCode">קוד נותן שירות</label>
-        <input
-          id="clientServiceCode"
-          type="text"
-          value={serviceCode}
-          onChange={(event) => setServiceCode(event.target.value.toUpperCase())}
-          placeholder="לדוגמה: JMR34E7"
-        />
-
+        <input id="clientServiceCode" type="text" value={serviceCode} onChange={(event) => setServiceCode(event.target.value.toUpperCase())} placeholder="לדוגמה: JMR34E7" />
         <label htmlFor="clientName">שם לקוח</label>
-        <input
-          id="clientName"
-          type="text"
-          value={clientName}
-          autoComplete="name"
-          onChange={(event) => setClientName(event.target.value)}
-          placeholder="ישראל ישראלי"
-        />
-
+        <input id="clientName" type="text" value={clientName} autoComplete="name" onChange={(event) => setClientName(event.target.value)} placeholder="ישראל ישראלי" />
         <label htmlFor="clientEmail">אימייל לקוח</label>
-        <input
-          id="clientEmail"
-          type="email"
-          value={clientEmail}
-          autoComplete="email"
-          onChange={(event) => setClientEmail(event.target.value)}
-          placeholder="client@example.com"
-        />
-
-        <PrimaryButton type="submit" disabled={!canLookup || isLoading}>
-          {isLoading ? 'טוען טופס...' : 'המשך לטופס לקוח'}
-        </PrimaryButton>
+        <input id="clientEmail" type="email" value={clientEmail} autoComplete="email" onChange={(event) => setClientEmail(event.target.value)} placeholder="client@example.com" />
+        <PrimaryButton type="submit" disabled={!canLookup || isLoading}>{isLoading ? 'טוען טופס...' : 'המשך לטופס לקוח'}</PrimaryButton>
       </form>
-
       {errorMessage ? <p className="auth-status auth-status-error">{errorMessage}</p> : null}
     </>
   )

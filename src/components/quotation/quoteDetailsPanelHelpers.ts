@@ -1,4 +1,4 @@
-import type { Quote, QuoteSource, StoredQuoteRecord } from '../../types/quotation'
+﻿import type { Quote, QuoteSource, StoredQuoteRecord } from '../../types/quotation'
 import type { EditableCustomField } from './QuoteCustomFieldsEditor'
 import type { EditableLineItem } from './quoteDetailsUtils'
 
@@ -18,12 +18,14 @@ export const QUOTE_UNIT_OPTIONS = [
   { value: 'meter', label: 'מטר' },
   { value: 'container', label: 'מכולה' },
   { value: 'package', label: 'קומפלט' },
-  { value: '%', label: 'אחוז (%) - ישן' },
   { value: 'percent', label: 'אחוז (%)' },
 ]
 
 export function quoteStatusLabel(record: StoredQuoteRecord): string {
-  return record.status === 'approved' ? 'מאושר' : 'טיוטה'
+  if (record.status === 'completed') return 'בוצעה'
+  if (record.status === 'approved') return 'מאושר'
+  if (record.clientRevisionPending) return 'מחכה לאישור מחדש'
+  return 'מחכה לאישור'
 }
 
 export function toFactor(value: string): number {
@@ -42,6 +44,7 @@ export function emptyLineItem(): EditableLineItem {
     unit: 'custom',
     quantity: '0',
     unitPrice: '0',
+    autoPriced: false,
   }
 }
 
