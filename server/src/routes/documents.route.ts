@@ -2,42 +2,18 @@ import { Router } from 'express'
 import type { AuthenticatedRequest } from '../middlewares/auth.middleware.js'
 import { requireAuth } from '../middlewares/auth.middleware.js'
 import { documentsUpload } from '../middlewares/upload.middleware.js'
-import { calculateFileHashFromPath, deleteFileIfExists } from '../services/document-hash.service.js'
+import { processUploadedDocuments } from '../services/document-upload.service.js'
 import { extractTextFromDocuments } from '../services/document-text-extractor.service.js'
 import {
   deleteStoredDocument,
   getStoredDocumentsByIds,
   listStoredDocuments,
   resolveTrainingDocumentIds,
-  saveUploadedDocuments,
 } from '../services/documents.service.js'
-import type { StoredDocument } from '../types/document.js'
+import { normalizeOriginalFileName } from '../utils/file-name-normalizer.js'
 
 type ExtractTextRequestBody = {
   documentIds?: unknown
-}
-
-type UploadedDocumentCandidate = Omit<StoredDocument, 'serviceProviderUid'>
-
-type UploadedFileWithMetadata = {
-  document: UploadedDocumentCandidate
-  tempPath: string
-}
-
-async function mapUploadedFile(file: Express.Multer.File): Promise<UploadedFileWithMetadata> {
-  const fileHash = await calculateFileHashFromPath(file.path)
-  return {
-    document: {
-      id: file.filename,
-      originalName: file.originalname,
-      storedName: file.filename,
-      mimeType: file.mimetype || 'unknown',
-      size: file.size,
-      fileHash,
-      uploadedAt: new Date().toISOString(),
-    },
-    tempPath: file.path,
-  }
 }
 
 function parseDocumentIds(value: unknown): string[] | null {
@@ -63,7 +39,7 @@ documentsRouter.get('/documents', requireAuth, async (req, res, next) => {
       .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt))
       .map((item) => ({
         id: item.id,
-        originalName: item.originalName,
+        originalName: normalizeOriginalFileName(item.originalName),
         storedName: item.storedName,
         mimeType: item.mimeType,
         size: item.size,
@@ -95,54 +71,21 @@ documentsRouter.post(
 
     try {
       const authReq = req as AuthenticatedRequest
-      const existingDocuments = await listStoredDocuments(authReq.authUser.uid)
-      const existingByHash = new Map(
-        existingDocuments
-          .filter((document) => document.fileHash.trim().length > 0)
-          .map((document) => [document.fileHash, document]),
-      )
-
-      const mappedFiles = await Promise.all(files.map((file) => mapUploadedFile(file)))
-      const acceptedDocuments: UploadedDocumentCandidate[] = []
-      const duplicates: Array<{
-        originalName: string
-        duplicatedWithDocumentId: string
-      }> = []
-
-      for (const candidate of mappedFiles) {
-        const existing = existingByHash.get(candidate.document.fileHash)
-        if (existing) {
-          await deleteFileIfExists(candidate.tempPath)
-          duplicates.push({
-            originalName: candidate.document.originalName,
-            duplicatedWithDocumentId: existing.id,
-          })
-          continue
-        }
-
-        acceptedDocuments.push(candidate.document)
-        existingByHash.set(candidate.document.fileHash, {
-          ...candidate.document,
-          serviceProviderUid: authReq.authUser.uid,
-        })
-      }
-
-      if (acceptedDocuments.length === 0) {
+      const result = await processUploadedDocuments(authReq.authUser.uid, files)
+      if (!result.hasNewDocuments) {
         res.status(200).json({
           ok: true,
           message: 'No new files were added. All uploaded files already exist.',
           documents: [],
-          duplicates,
+          duplicates: result.duplicates,
         })
         return
       }
 
-      await saveUploadedDocuments(authReq.authUser.uid, acceptedDocuments)
-
       res.status(201).json({
         ok: true,
-        documents: acceptedDocuments,
-        duplicates,
+        documents: result.documents,
+        duplicates: result.duplicates,
       })
     } catch (error) {
       next(error)
@@ -193,7 +136,7 @@ documentsRouter.post('/documents/extract-text', requireAuth, async (req, res, ne
     const extracted = await extractTextFromDocuments(storedDocuments)
     const responseDocuments = extracted.map((item) => ({
       id: item.documentId,
-      originalName: item.originalName,
+      originalName: normalizeOriginalFileName(item.originalName),
       format: item.detectedFormat,
       quoteDate: item.quoteDate,
       pricingContext: item.pricingContext,

@@ -131,7 +131,7 @@ export function ClientQuotesPanel({
                 <tr key={record.id} className={record.id === selectedId ? 'quote-row active' : 'quote-row'}>
                   <td>{new Date(record.createdAt).toLocaleString('he-IL')}</td>
                   <td>{statusLabel(record)}</td>
-                  <td>{formatCurrencyIls(record.quote.estimatedPrice)}</td>
+                  <td>{record.status === 'approved' || record.status === 'completed' ? formatCurrencyIls(record.quote.estimatedPrice) : 'ממתין לאישור'}</td>
                   <td>
                     <button type="button" className="quote-line-add" onClick={() => openQuote(record)}>
                       פרטים

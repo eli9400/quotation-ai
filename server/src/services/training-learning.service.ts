@@ -11,8 +11,9 @@ import { rebuildTrainingDatasetFromObservations } from './training-dataset.servi
 import {
   completeTrainingJob,
   failTrainingJob,
-  setTrainingJobProgress,
+  updateTrainingJobProgress,
 } from './training-jobs.service.js'
+import type { TrainingStage } from '../types/training.js'
 
 type RunTrainingParams = {
   jobId: string
@@ -49,16 +50,29 @@ export async function runLearningTrainingJob(params: RunTrainingParams): Promise
         : params.documentIds
 
     let lastProgress = 5
-    const reportProgress = async (value: number): Promise<void> => {
+    const reportProgress = async (
+      value: number,
+      stage?: TrainingStage,
+      stageValue?: number,
+    ): Promise<void> => {
       const clamped = Math.max(0, Math.min(99, Math.round(value)))
-      if (clamped <= lastProgress) {
+      const nextStageValue =
+        stageValue === undefined
+          ? undefined
+          : Math.max(0, Math.min(100, Math.round(stageValue)))
+      if (clamped <= lastProgress && !stage) {
         return
       }
-      lastProgress = clamped
-      await setTrainingJobProgress(params.jobId, clamped)
+      lastProgress = Math.max(lastProgress, clamped)
+      await updateTrainingJobProgress(params.jobId, {
+        progress: clamped,
+        currentStage: stage,
+        stageProgress:
+          stage && nextStageValue !== undefined ? { [stage]: nextStageValue } : undefined,
+      })
     }
 
-    await reportProgress(12)
+    await reportProgress(12, 'prepare', 100)
     const storedDocuments = await getStoredDocumentsByIds(
       params.serviceProviderUid,
       processingDocumentIds,
@@ -67,11 +81,15 @@ export async function runLearningTrainingJob(params: RunTrainingParams): Promise
       throw new Error('Training documents are missing or inaccessible.')
     }
 
-    await reportProgress(34)
+    await reportProgress(34, 'load_documents', 100)
     let lastExtractLog = 0
     const extractedDocuments = await extractTextFromDocuments(storedDocuments, {
       onProgress: async ({ processed, total }) => {
-        await reportProgress(interpolateProgress(34, 58, processed, total))
+        await reportProgress(
+          interpolateProgress(34, 58, processed, total),
+          'extract_text',
+          interpolateProgress(0, 100, processed, total),
+        )
         if (
           processed === total ||
           processed === 1 ||
@@ -82,10 +100,10 @@ export async function runLearningTrainingJob(params: RunTrainingParams): Promise
         }
       },
     })
-    await reportProgress(58)
+    await reportProgress(58, 'extract_text', 100)
 
     const parsed = extractPricingObservations(extractedDocuments)
-    await reportProgress(64)
+    await reportProgress(64, 'parse_pricing_lines', 0)
     let lastAiLog = 0
     let aiParsed: ReturnType<typeof extractPricingObservationsWithOpenAi> extends Promise<infer T>
       ? T
@@ -93,7 +111,11 @@ export async function runLearningTrainingJob(params: RunTrainingParams): Promise
     try {
       aiParsed = await extractPricingObservationsWithOpenAi(extractedDocuments, {
         onProgress: async ({ processed, total }) => {
-          await reportProgress(interpolateProgress(64, 76, processed, total))
+          await reportProgress(
+            interpolateProgress(64, 76, processed, total),
+            'parse_pricing_lines',
+            interpolateProgress(0, 100, processed, total),
+          )
           if (
             processed === total ||
             processed === 1 ||
@@ -126,7 +148,7 @@ export async function runLearningTrainingJob(params: RunTrainingParams): Promise
         'No pricing line-items were detected. Upload clearer quote files or include table-based documents (PDF/XLSX).',
       )
     }
-    await reportProgress(76)
+    await reportProgress(76, 'parse_pricing_lines', 100)
 
     const datasetResult = await rebuildTrainingDatasetFromObservations({
       serviceProviderUid: params.serviceProviderUid,
@@ -136,17 +158,18 @@ export async function runLearningTrainingJob(params: RunTrainingParams): Promise
     console.info(
       `[dataset] rebuilt for ${params.serviceProviderUid}: examples=${datasetResult.totalExamples}, train=${datasetResult.splitCounts.train}, validation=${datasetResult.splitCounts.validation}, test=${datasetResult.splitCounts.test}, items=${datasetResult.uniqueItems}`,
     )
-    await reportProgress(86)
+    await reportProgress(86, 'build_dataset', 100)
 
     await learnPricingItemsFromObservations(params.serviceProviderUid, observations)
-    await reportProgress(94)
+    await reportProgress(94, 'learn_items', 100)
 
     const normalizeResult = await normalizePricingItemsForServiceProvider(params.serviceProviderUid)
     const schema = await buildDynamicFormSchema(params.serviceProviderUid)
     console.info(
       `[training] normalized pricing_items for ${params.serviceProviderUid}: before=${normalizeResult.before}, after=${normalizeResult.after}, removedDuplicates=${normalizeResult.removedDuplicates}, removedNoise=${normalizeResult.removedNoise}, schemaFields=${schema.fields.length}`,
     )
-    await reportProgress(98)
+    await reportProgress(98, 'normalize_schema', 100)
+    await reportProgress(99, 'finalize', 100)
 
     await completeTrainingJob(params.jobId)
   } catch (error) {

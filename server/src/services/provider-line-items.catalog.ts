@@ -13,67 +13,6 @@ type CatalogTemplate = {
   unit: PricingUnit
 }
 
-const CATEGORY_BASE_CATALOG: Record<string, ProviderCatalogLineItem[]> = {
-  construction_renovation: [
-    { key: 'painting_walls', name: 'צביעת קירות ותקרות', unit: 'sqm' },
-    { key: 'plaster_walls', name: 'שפכטל והכנת קירות', unit: 'sqm' },
-    { key: 'floor_tiles', name: 'ריצוף גרניט פורצלן', unit: 'sqm' },
-    { key: 'electrical_point', name: 'התקנת נקודת חשמל', unit: 'point' },
-    { key: 'water_point', name: 'נקודת מים/ביוב', unit: 'point' },
-    { key: 'debris_container', name: 'פינוי מכולת פסולת', unit: 'container' },
-  ],
-  transport_logistics: [
-    { key: 'service_visit', name: 'ביקור שירות', unit: 'unit' },
-    { key: 'hourly_work', name: 'עבודה לפי שעה', unit: 'hour' },
-    { key: 'local_delivery', name: 'משלוח עירוני', unit: 'unit' },
-  ],
-  maintenance_home_services: [
-    { key: 'service_visit', name: 'ביקור שירות', unit: 'unit' },
-    { key: 'hourly_work', name: 'עבודה לפי שעה', unit: 'hour' },
-    { key: 'home_cleaning', name: 'ניקיון בית', unit: 'sqm' },
-  ],
-  digital_technology: [
-    { key: 'hourly_work', name: 'עבודה לפי שעה', unit: 'hour' },
-    { key: 'feature_development', name: 'פיתוח פיצ׳ר', unit: 'unit' },
-    { key: 'maintenance_package', name: 'תחזוקה חודשית', unit: 'package' },
-  ],
-  marketing_design_creative: [
-    { key: 'editing_hour', name: 'שעת עריכה/עיצוב', unit: 'hour' },
-    { key: 'content_item', name: 'פריט תוכן', unit: 'unit' },
-    { key: 'creative_package', name: 'חבילת שירות', unit: 'package' },
-  ],
-  licensed_professions: [
-    { key: 'consultation_hour', name: 'שעת ייעוץ מקצועי', unit: 'hour' },
-    { key: 'review_package', name: 'בדיקה/חוות דעת', unit: 'package' },
-    { key: 'document_preparation', name: 'הכנת מסמך מקצועי', unit: 'package' },
-  ],
-  health_therapy: [
-    { key: 'treatment_session', name: 'טיפול/מפגש', unit: 'unit' },
-    { key: 'diagnostic_session', name: 'מפגש אבחון', unit: 'unit' },
-    { key: 'therapy_program', name: 'תכנית טיפול', unit: 'package' },
-  ],
-  education_training: [
-    { key: 'lesson_hour', name: 'שיעור לפי שעה', unit: 'hour' },
-    { key: 'course_package', name: 'חבילת קורס', unit: 'package' },
-    { key: 'session', name: 'מפגש הדרכה', unit: 'unit' },
-  ],
-  consulting_business_personal: [
-    { key: 'strategy_session', name: 'פגישת ייעוץ', unit: 'hour' },
-    { key: 'monthly_package', name: 'ליווי חודשי', unit: 'package' },
-    { key: 'analysis_report', name: 'דוח ניתוח', unit: 'package' },
-  ],
-  arts_entertainment: [
-    { key: 'event_performance', name: 'הופעה באירוע', unit: 'unit' },
-    { key: 'event_package', name: 'חבילת אירוע', unit: 'package' },
-    { key: 'rehearsal_hour', name: 'שעת חזרה/עבודה', unit: 'hour' },
-  ],
-  everyday_small_services: [
-    { key: 'basic_service', name: 'שירות בסיסי', unit: 'unit' },
-    { key: 'treatment_service', name: 'טיפול/שירות', unit: 'unit' },
-    { key: 'session_hour', name: 'מפגש לפי שעה', unit: 'hour' },
-  ],
-}
-
 const CATEGORY_GENERIC_TEMPLATES: Record<string, CatalogTemplate[]> = {
   construction_renovation: [
     { suffix: 'visit', name: 'ביקור שירות', unit: 'unit' },
@@ -108,7 +47,7 @@ const CATEGORY_GENERIC_TEMPLATES: Record<string, CatalogTemplate[]> = {
   health_therapy: [
     { suffix: 'session', name: 'מפגש', unit: 'unit' },
     { suffix: 'hourly', name: 'שעת טיפול', unit: 'hour' },
-    { suffix: 'package', name: 'תכנית טיפול', unit: 'package' },
+    { suffix: 'package', name: 'תוכנית טיפול', unit: 'package' },
   ],
   education_training: [
     { suffix: 'session', name: 'מפגש', unit: 'unit' },
@@ -174,6 +113,20 @@ const INDUSTRY_SPECIFIC_CATALOG: Record<string, ProviderCatalogLineItem[]> = {
     { key: 'office_clean', name: 'ניקיון משרד', unit: 'sqm' },
     { key: 'window_clean', name: 'ניקוי חלונות', unit: 'sqm' },
   ],
+  gardener: [
+    { key: 'lawn_mowing', name: 'כיסוח דשא', unit: 'sqm' },
+    { key: 'hedge_trimming', name: 'גיזום שיחים וגדר חיה', unit: 'meter' },
+    { key: 'seasonal_planting', name: 'שתילה עונתית', unit: 'unit' },
+    { key: 'irrigation_maintenance', name: 'תחזוקת מערכת השקיה', unit: 'unit' },
+    { key: 'garden_cleanup', name: 'ניקיון וסידור גינה', unit: 'hour' },
+  ],
+  landscape_contractor: [
+    { key: 'landscape_planning', name: 'תכנון גינה ופיתוח חוץ', unit: 'package' },
+    { key: 'soil_preparation', name: 'יישור והכנת קרקע', unit: 'sqm' },
+    { key: 'irrigation_installation', name: 'התקנת מערכת השקיה', unit: 'unit' },
+    { key: 'synthetic_grass_install', name: 'התקנת דשא סינטטי', unit: 'sqm' },
+    { key: 'deck_pergola_install', name: 'התקנת דק/פרגולה', unit: 'sqm' },
+  ],
 }
 
 function normalizeKey(value: string): string {
@@ -210,10 +163,8 @@ export function getCatalogLineItemsForIndustry(
   const normalizedIndustry = normalizeKey(industryValue)
   const specific = INDUSTRY_SPECIFIC_CATALOG[normalizedIndustry] ?? []
   const templates = toTemplateItems(normalizedIndustry, categoryId)
-  if (specific.length > 0) {
-    return dedupeItems([...specific, ...templates])
-  }
 
-  const categoryBase = CATEGORY_BASE_CATALOG[categoryId] ?? []
-  return dedupeItems(categoryBase)
+  if (specific.length > 0) return dedupeItems([...specific, ...templates])
+  if (templates.length > 0) return dedupeItems(templates)
+  return []
 }

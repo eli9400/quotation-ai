@@ -1,6 +1,5 @@
 import { buildQuoteFromLineItems } from './quote-breakdown.service.js'
 import { resolveCpiAdjustmentForQuote } from './cpi-quote-factor.service.js'
-import { listLearnedPricingItems } from './dynamic-form-schema.service.js'
 import {
   applyBoundedReasoningAdjustment,
   calibrationDeltaForLine,
@@ -9,8 +8,10 @@ import {
 } from './learned-quote-utils.service.js'
 import { buildMarketPricedLines } from './market-quote-lines.service.js'
 import { calibrateUnitPricesWithOpenAi } from './openai-line-pricing.service.js'
+import { listProviderPricingItemsWithIndustryBaseline } from './pricing-items-source.service.js'
 import { buildGroundedPricingLines } from './pricing-engine.service.js'
 import { applyCpiFactorToUnitPrice } from './quote-pricing-adjustments.service.js'
+import { getServiceProviderByUid } from './service-providers.service.js'
 import type {
   GeneratedQuote,
   QuoteClientRequest,
@@ -46,7 +47,11 @@ function toPersistedLineItems(lines: InternalPricedLine[]): QuoteLineItem[] {
 export async function generateLearnedQuote(
   input: GenerateLearnedQuoteInput,
 ): Promise<GeneratedQuote | null> {
-  const learnedItems = await listLearnedPricingItems(input.serviceProviderUid)
+  const profile = await getServiceProviderByUid(input.serviceProviderUid)
+  const learnedItems = await listProviderPricingItemsWithIndustryBaseline(
+    input.serviceProviderUid,
+    profile?.industry ?? '',
+  )
   if (learnedItems.length === 0) return null
 
   const requestedItems = (input.request.requestedItems ?? []).filter(

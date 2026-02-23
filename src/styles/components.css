@@ -49,6 +49,48 @@
 .progress-fill { height: 100%; background: linear-gradient(90deg, #0f725c, #2fa187); transition: width 0.35s ease; }
 .progress-value { margin-top: 0.45rem !important; font-size: 0.86rem; }
 
+.training-stage-list {
+  margin-top: 0.75rem;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-inline-end: 0.35rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.training-stage-item {
+  border: 1px solid #dcebe5;
+  border-radius: 10px;
+  padding: 0.5rem 0.65rem;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.training-stage-item.active {
+  border-color: #8fc6b5;
+  background: #f4fffb;
+}
+
+.training-stage-item.done {
+  border-color: #b5d7cc;
+}
+
+.training-stage-label {
+  margin: 0 !important;
+  color: var(--text-strong) !important;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.training-stage-item .progress-track {
+  margin-top: 0.4rem;
+  height: 0.55rem;
+}
+
+.training-stage-item .progress-value {
+  margin-top: 0.25rem !important;
+  font-size: 0.78rem;
+}
+
 .quote-form { margin-top: 0.45rem; display: grid; gap: 0.45rem; }
 .quote-form label { color: var(--text-strong); font-weight: 600; font-size: 0.92rem; }
 

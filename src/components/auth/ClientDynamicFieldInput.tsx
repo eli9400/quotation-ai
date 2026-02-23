@@ -122,25 +122,13 @@ export function ClientDynamicFieldInput({
         </>
       ) : isVehicleTrimField(field) ? (
         <>
-          <select
-            value={selectedTrimValue}
-            disabled={disabled}
-            onChange={(event) => onChange(event.target.value)}
-          >
-            <option value="">{TRIM_SELECT_PLACEHOLDER}</option>
-            {trimOptions.map((option) => (
-              <option key={option.value} value={option.label}>
-                {option.label}
-              </option>
-            ))}
-          </select>
           <input
             list={TRIM_DATALIST_ID}
             type="text"
-            value={value}
+            value={selectedTrimValue || value}
             disabled={disabled}
             onChange={(event) => onChange(event.target.value)}
-            placeholder={field.placeholder ?? 'Premium / Luxury / GLI'}
+            placeholder={field.placeholder ?? TRIM_SELECT_PLACEHOLDER}
           />
           <datalist id={TRIM_DATALIST_ID}>
             {filteredTrims.map((option) => (

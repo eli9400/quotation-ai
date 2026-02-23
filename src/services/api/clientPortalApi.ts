@@ -29,6 +29,8 @@ type ClientLineItemsResponse = {
     sourceItemId: string
     label: string
     unit: string
+    categoryId?: string
+    categoryLabel?: string
   }>
 }
 
@@ -44,12 +46,16 @@ export type ClientExtraRequestedItem = {
   label: string
   quantity: number
   unit?: string
+  categoryId?: string
+  categoryLabel?: string
 }
 
 export type ClientLineItemOption = {
   sourceItemId: string
   label: string
   unit?: string
+  categoryId?: string
+  categoryLabel?: string
 }
 
 export type VehicleCatalogOption = {

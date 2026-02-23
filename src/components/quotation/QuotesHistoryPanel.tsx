@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   getProviderCustomFeatureOptions,
   getProviderLineItemOptions,
-} from '../../services/api/quotationApi'
+} from '../../services/api/modelApi'
 import {
   approveQuoteRecord,
   completeQuoteRecord,

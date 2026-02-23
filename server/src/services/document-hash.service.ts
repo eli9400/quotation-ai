@@ -2,6 +2,12 @@ import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { unlink } from 'node:fs/promises'
 
+export function calculateFileHashFromBuffer(fileBuffer: Buffer): string {
+  const hash = createHash('sha256')
+  hash.update(fileBuffer)
+  return hash.digest('hex')
+}
+
 export async function calculateFileHashFromPath(filePath: string): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const hash = createHash('sha256')

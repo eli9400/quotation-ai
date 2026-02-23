@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { ServiceProviderAuthPanel } from './components/auth/ServiceProviderAuthPanel'
 import { ServiceProviderTopBar } from './components/auth/ServiceProviderTopBar'
+import { ClientFormItemsEditorPanel } from './components/quotation/ClientFormItemsEditorPanel'
 import { ClientFormPreviewPanel } from './components/quotation/ClientFormPreviewPanel'
 import { DocumentsPanel } from './components/quotation/DocumentsPanel'
 import { QuotesHistoryPanel } from './components/quotation/QuotesHistoryPanel'
@@ -13,6 +15,7 @@ import { useServiceProviderAuth } from './hooks/useServiceProviderAuth'
 import './App.css'
 
 function App() {
+  const [formPreviewRefreshTick, setFormPreviewRefreshTick] = useState(0)
   const {
     isLoading: isAuthLoading,
     isSigningIn,
@@ -31,6 +34,7 @@ function App() {
     documents,
     trainingProgress,
     trainingStatus,
+    trainingStages,
     isTraining,
     isUploading,
     canTrain,
@@ -43,7 +47,7 @@ function App() {
     removeDocument,
     startTraining,
   } = useQuotationMvp(idToken)
-  const formPreview = useClientFormPreview(idToken, modelReady)
+  const formPreview = useClientFormPreview(idToken, `${modelReady}-${formPreviewRefreshTick}`)
 
   if (isAuthLoading) {
     return (
@@ -89,6 +93,7 @@ function App() {
                 <TrainingPanel
                   status={trainingStatus}
                   progress={trainingProgress}
+                  stages={trainingStages}
                   isTraining={isTraining}
                   canTrain={canTrain}
                   onStartTraining={startTraining}
@@ -97,6 +102,10 @@ function App() {
               <ClientFormPreviewPanel
                 schema={formPreview.schema}
                 isLoading={formPreview.isLoading}
+              />
+              <ClientFormItemsEditorPanel
+                authToken={idToken}
+                onSaved={() => setFormPreviewRefreshTick((current) => current + 1)}
               />
             </div>
           </section>

@@ -1,9 +1,6 @@
 import { env } from '../../config/env'
 import type {
   ClientRequestForm,
-  FormPreviewSchema,
-  ProviderCustomFeatureOption,
-  ProviderLineItemOption,
   Quote,
   QuoteSource,
   StoredQuoteRecord,
@@ -56,18 +53,6 @@ type ListQuotesResponse = {
   ok: boolean
   quotes: QuoteRecordPayload[]
 }
-type FormPreviewResponse = {
-  ok: boolean
-  schema: FormPreviewSchema
-}
-type ProviderLineItemsResponse = {
-  ok: boolean
-  items: ProviderLineItemOption[]
-}
-type ProviderCustomFeaturesResponse = {
-  ok: boolean
-  features: ProviderCustomFeatureOption[]
-}
 
 function apiUrl(path: string): string {
   return `${env.apiBaseUrl}${path}`
@@ -79,10 +64,28 @@ function authHeaders(idToken: string): HeadersInit {
   }
 }
 
+const MOJIBAKE_MARKERS = /[ÃÂÐÑ×ØÙÚÛÜÝÞß]/g
+const MOJIBAKE_TEST = /[ÃÂÐÑ×ØÙÚÛÜÝÞß]/
+
+function decodeLikelyMojibake(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed || !MOJIBAKE_TEST.test(trimmed)) return trimmed
+  const bytes = Array.from(trimmed).map((char) => char.charCodeAt(0) & 0xff)
+  try {
+    const decoded = new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(bytes)).trim()
+    if (!decoded) return trimmed
+    const originalNoise = (trimmed.match(MOJIBAKE_MARKERS) ?? []).length
+    const decodedNoise = (decoded.match(MOJIBAKE_MARKERS) ?? []).length
+    return decodedNoise < originalNoise ? decoded : trimmed
+  } catch {
+    return trimmed
+  }
+}
+
 function toUiDocument(document: UploadDocumentsResponse['documents'][number]): UploadedDocument {
   return {
     id: document.id,
-    name: document.originalName,
+    name: decodeLikelyMojibake(document.originalName),
     size: document.size,
     type: document.mimeType || 'unknown',
     uploadedAt: new Date(document.uploadedAt).toLocaleString('he-IL'),
@@ -197,38 +200,4 @@ export async function listQuotes(idToken: string): Promise<StoredQuoteRecord[]> 
     headers: authHeaders(idToken),
   })
   return payload.quotes.map(mapQuoteRecordPayload)
-}
-
-export async function getFormPreviewSchema(idToken: string): Promise<FormPreviewSchema> {
-  const payload = await requestJson<FormPreviewResponse>(apiUrl('/model/form-preview'), {
-    method: 'GET',
-    headers: authHeaders(idToken),
-  })
-  return payload.schema
-}
-
-export async function getProviderLineItemOptions(
-  idToken: string,
-): Promise<ProviderLineItemOption[]> {
-  const payload = await requestJson<ProviderLineItemsResponse>(
-    apiUrl('/model/provider-line-items'),
-    {
-      method: 'GET',
-      headers: authHeaders(idToken),
-    },
-  )
-  return payload.items
-}
-
-export async function getProviderCustomFeatureOptions(
-  idToken: string,
-): Promise<ProviderCustomFeatureOption[]> {
-  const payload = await requestJson<ProviderCustomFeaturesResponse>(
-    apiUrl('/model/custom-features'),
-    {
-      method: 'GET',
-      headers: authHeaders(idToken),
-    },
-  )
-  return payload.features
 }

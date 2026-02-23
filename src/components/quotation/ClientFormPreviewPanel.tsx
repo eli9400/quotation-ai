@@ -14,7 +14,6 @@ function renderPreviewControl(field: FormPreviewSchema['fields'][number]) {
   if (field.type === 'textarea') {
     return <textarea disabled rows={3} placeholder={field.placeholder ?? ''} />
   }
-
   if (field.type === 'select') {
     return (
       <select disabled defaultValue="">
@@ -27,7 +26,6 @@ function renderPreviewControl(field: FormPreviewSchema['fields'][number]) {
       </select>
     )
   }
-
   return (
     <input
       disabled
@@ -41,19 +39,17 @@ function schemaDescription(schema: FormPreviewSchema | null): string {
   if (!schema) {
     return 'התצוגה תופיע אחרי אימון ראשון או כשיש מודל שמור.'
   }
-
-  const dynamicCount = schema.fields.filter((field) => isClientVisibleField(field) && field.sourceItemId !== null).length
   const generatedAt = new Date(schema.generatedAt).toLocaleString('he-IL')
-  return `השדות נבנו לפי האימון האחרון. שדות דינמיים: ${dynamicCount}. עדכון: ${generatedAt}.`
+  return `הרכיבים ללקוח נטענים לפי קטגוריות. רכיבים זמינים להוספה: ${schema.sourceItemsCount}. עדכון: ${generatedAt}.`
 }
 
 export function ClientFormPreviewPanel({ schema, isLoading }: ClientFormPreviewPanelProps) {
   return (
-    <Panel title="תצוגת טופס ללקוח" description={schemaDescription(schema)}>
+    <Panel title="תצוגת טופס לקוח" description={schemaDescription(schema)}>
       {isLoading ? (
         <p className="empty">טוען תצוגת טופס...</p>
       ) : !schema || schema.fields.filter(isClientVisibleField).length === 0 ? (
-        <p className="empty">לא נמצא מודל שמור. העלו מסמכים והריצו אימון.</p>
+        <p className="empty">לא נמצא מודל שמור.</p>
       ) : (
         <form className="preview-form">
           {schema.fields

@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto'
 import { getFirestoreDb } from '../config/firebase.js'
 import { shouldKeepPricingObservation } from './pricing-items-learning.service.js'
+import { getServiceProviderByUid } from './service-providers.service.js'
 import {
   buildDynamicFeaturePayload,
   listServiceProviderFeatures,
 } from './service-provider-features.service.js'
+import { canonicalizeTrainingItemForIndustry } from './training-item-canonicalization.service.js'
 import {
   assignDatasetSplitsByItemDocument,
   resolveObservationSplit,
@@ -30,10 +32,6 @@ type RebuildInput = {
 
 function nowIso(): string {
   return new Date().toISOString()
-}
-
-function toItemKey(observation: PricingObservation): string {
-  return `${observation.canonicalName}|${observation.unit}`
 }
 
 function sanitizeObservations(observations: PricingObservation[]): PricingObservation[] {
@@ -76,6 +74,7 @@ function toExamples(
   trainingJobId: string,
   observations: PricingObservation[],
   dynamicFeatures: ReturnType<typeof buildDynamicFeaturePayload>,
+  industry: string | null,
 ): TrainingDatasetExample[] {
   const splitAssignment = assignDatasetSplitsByItemDocument(observations)
   const duplicateCounter = new Map<string, number>()
@@ -96,6 +95,11 @@ function toExamples(
 
     const lineTotal =
       observation.lineTotal > 0 ? observation.lineTotal : observation.quantity * observation.pricePerUnit
+    const canonical = canonicalizeTrainingItemForIndustry(
+      observation.canonicalName,
+      observation.unit,
+      industry,
+    )
 
     return {
       id: buildExampleId(serviceProviderUid, observation, duplicateIndex),
@@ -105,9 +109,9 @@ function toExamples(
       sourceQuoteDate: observation.sourceQuoteDate,
       sourceQuoteId: null,
       sourceTrainingJobId: trainingJobId,
-      itemKey: toItemKey(observation),
-      itemName: observation.canonicalName,
-      unit: observation.unit,
+      itemKey: canonical.itemKey,
+      itemName: canonical.itemName,
+      unit: canonical.unit,
       quantity: observation.quantity,
       lineTotal,
       targetUnitPrice: observation.pricePerUnit,
@@ -186,13 +190,17 @@ export async function rebuildTrainingDatasetFromObservations(
     }
   }
 
-  const featureDefinitions = await listServiceProviderFeatures(input.serviceProviderUid)
+  const [featureDefinitions, serviceProvider] = await Promise.all([
+    listServiceProviderFeatures(input.serviceProviderUid),
+    getServiceProviderByUid(input.serviceProviderUid),
+  ])
   const dynamicFeatures = buildDynamicFeaturePayload(featureDefinitions)
   const examples = toExamples(
     input.serviceProviderUid,
     input.trainingJobId,
     filtered,
     dynamicFeatures,
+    serviceProvider?.industry ?? null,
   )
   const db = getFirestoreDb()
   const sourceDocumentIds = Array.from(new Set(filtered.map((observation) => observation.sourceDocumentId)))

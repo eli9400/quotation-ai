@@ -31,6 +31,16 @@ function normalizeField(field: IntakeFieldTemplate): IntakeFieldTemplate {
   }
 }
 
+function dedupeFieldsByKey(fields: IntakeFieldTemplate[]): IntakeFieldTemplate[] {
+  const byKey = new Map<string, IntakeFieldTemplate>()
+  fields.forEach((field) => {
+    if (!byKey.has(field.key)) {
+      byKey.set(field.key, field)
+    }
+  })
+  return Array.from(byKey.values())
+}
+
 function normalizeTemplate(
   input: ServiceProviderIntakeTemplate,
   fallback: ServiceProviderIntakeTemplate,
@@ -41,6 +51,7 @@ function normalizeTemplate(
         .map(normalizeField)
         .filter((field) => field.key.length > 0 && field.label.length > 0)
     : []
+  const normalizedFields = dedupeFieldsByKey(fields)
   return {
     id: fallback.id,
     industry: fallback.industry,
@@ -56,7 +67,7 @@ function normalizeTemplate(
       typeof input.categoryLabel === 'string' && input.categoryLabel.trim().length > 0
         ? input.categoryLabel.trim()
         : fallback.categoryLabel,
-    fields: fields.length > 0 ? fields : fallback.fields,
+    fields: normalizedFields.length > 0 ? normalizedFields : fallback.fields,
     updatedAt:
       typeof input.updatedAt === 'string' && input.updatedAt.trim().length > 0
         ? input.updatedAt.trim()
@@ -103,4 +114,3 @@ export async function seedDefaultIntakeTemplatesToFirestore(): Promise<{ upserte
 
   return { upserted }
 }
-

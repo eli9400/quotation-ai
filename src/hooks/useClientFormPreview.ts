@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getFormPreviewSchema } from '../services/api/quotationApi'
+import { getFormPreviewSchema } from '../services/api/modelApi'
 import type { FormPreviewSchema } from '../types/quotation'
 
 type UseClientFormPreviewResult = {

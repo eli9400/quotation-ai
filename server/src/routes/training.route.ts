@@ -79,10 +79,14 @@ trainingRouter.post('/training/start', requireAuth, async (req, res, next) => {
       listUploadedDocumentIdsInDataset(authReq.authUser.uid),
     ])
 
-    const baselineTrainedDocumentIds =
-      trainedDocumentIdsFromDataset.length > 0
-        ? trainedDocumentIdsFromDataset
-        : latestCompleted?.documentIds ?? []
+    // A document is considered "already trained" only if:
+    // 1) it appears in a completed job, and
+    // 2) it has dataset examples.
+    // This avoids a failed/incomplete run from blocking re-training.
+    const datasetTrainedSet = new Set(trainedDocumentIdsFromDataset)
+    const baselineTrainedDocumentIds = latestCompleted
+      ? latestCompleted.documentIds.filter((id) => datasetTrainedSet.has(id))
+      : []
     const alreadyTrainedSet = new Set(baselineTrainedDocumentIds)
     const incrementalDocumentIds = selectedDocumentIds.filter((id) => !alreadyTrainedSet.has(id))
     if (incrementalDocumentIds.length === 0) {

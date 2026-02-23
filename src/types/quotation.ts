@@ -74,10 +74,24 @@ export type ClientRequestForm = {
 
 export type TrainingStatus = 'running' | 'completed' | 'failed'
 
+export type TrainingStage =
+  | 'prepare'
+  | 'load_documents'
+  | 'extract_text'
+  | 'parse_pricing_lines'
+  | 'build_dataset'
+  | 'learn_items'
+  | 'normalize_schema'
+  | 'finalize'
+
+export type TrainingStageProgress = Record<TrainingStage, number>
+
 export type TrainingJob = {
   id: string
   status: TrainingStatus
   progress: number
+  currentStage: TrainingStage
+  stageProgress: TrainingStageProgress
   documentIds: string[]
   startedAt: string
   updatedAt: string
@@ -130,6 +144,9 @@ export type ProviderLineItemOption = {
   id: string
   label: string
   canonicalName: string
+  clientLabel: string
+  categoryId: string
+  categoryLabel: string
   unit: string
   aliases: string[]
   sampleLines: number
@@ -138,6 +155,8 @@ export type ProviderLineItemOption = {
     unitPrice: number
   }>
   isProviderOnly: boolean
+  visibleToClient: boolean
+  sourceType: 'provider' | 'industry' | 'catalog'
 }
 
 export type ProviderCustomFeatureOption = {

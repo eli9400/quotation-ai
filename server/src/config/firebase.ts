@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { cert, getApps, initializeApp } from 'firebase-admin/app'
+import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
 import { getFirestore } from 'firebase-admin/firestore'
 import { getStorage } from 'firebase-admin/storage'
@@ -15,6 +15,14 @@ type ServiceAccountLike = {
 type FirebaseConfigStatus = {
   enabled: boolean
   missingKeys: string[]
+}
+
+type FirebaseCredentialSource = {
+  projectId: string
+  clientEmail: string
+  privateKey: string
+  storageBucket: string
+  useApplicationDefault: boolean
 }
 
 function normalizePrivateKey(value: string): string {
@@ -42,29 +50,37 @@ function readServiceAccountFromFile(): ServiceAccountLike | null {
   }
 }
 
-function getCredentialsFromSource() {
+function getCredentialsFromSource(): FirebaseCredentialSource {
   const fileCredentials = readServiceAccountFromFile()
   const projectId = fileCredentials?.project_id ?? env.firebaseProjectId
   const clientEmail = fileCredentials?.client_email ?? env.firebaseClientEmail
   const privateKey = fileCredentials?.private_key ?? env.firebasePrivateKey
   const storageBucket = env.firebaseStorageBucket
+  const isCloudRunRuntime = typeof process.env.K_SERVICE === 'string' && process.env.K_SERVICE.length > 0
+  const useApplicationDefault = env.firebaseUseAdc || isCloudRunRuntime
 
   return {
     projectId,
     clientEmail,
     privateKey: normalizePrivateKey(privateKey),
     storageBucket,
+    useApplicationDefault,
   }
 }
 
 export function getFirebaseConfigStatus(): FirebaseConfigStatus {
   const credentials = getCredentialsFromSource()
+  const hasServiceAccountCredentials = Boolean(
+    credentials.projectId && credentials.clientEmail && credentials.privateKey,
+  )
   const missingKeys: string[] = []
 
-  if (!credentials.projectId) missingKeys.push('FIREBASE_PROJECT_ID')
-  if (!credentials.clientEmail) missingKeys.push('FIREBASE_CLIENT_EMAIL')
-  if (!credentials.privateKey) missingKeys.push('FIREBASE_PRIVATE_KEY')
   if (!credentials.storageBucket) missingKeys.push('FIREBASE_STORAGE_BUCKET')
+  if (!hasServiceAccountCredentials && !credentials.useApplicationDefault) {
+    missingKeys.push('FIREBASE_PROJECT_ID')
+    missingKeys.push('FIREBASE_CLIENT_EMAIL')
+    missingKeys.push('FIREBASE_PRIVATE_KEY')
+  }
 
   return { enabled: missingKeys.length === 0, missingKeys }
 }
@@ -77,14 +93,25 @@ export function initializeFirebaseIfConfigured(): boolean {
 
   const credentials = getCredentialsFromSource()
   if (getApps().length === 0) {
-    initializeApp({
-      credential: cert({
-        projectId: credentials.projectId,
-        clientEmail: credentials.clientEmail,
-        privateKey: credentials.privateKey,
-      }),
-      storageBucket: credentials.storageBucket,
-    })
+    const hasServiceAccountCredentials = Boolean(
+      credentials.projectId && credentials.clientEmail && credentials.privateKey,
+    )
+    if (hasServiceAccountCredentials) {
+      initializeApp({
+        credential: cert({
+          projectId: credentials.projectId,
+          clientEmail: credentials.clientEmail,
+          privateKey: credentials.privateKey,
+        }),
+        storageBucket: credentials.storageBucket,
+      })
+    } else {
+      initializeApp({
+        credential: applicationDefault(),
+        projectId: credentials.projectId || process.env.GOOGLE_CLOUD_PROJECT,
+        storageBucket: credentials.storageBucket,
+      })
+    }
   }
 
   return true

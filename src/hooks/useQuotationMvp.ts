@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  deleteDocument,
-  getLatestCompletedTrainingJob,
-  getTrainingJob,
-  listDocuments,
-  startTraining,
-  uploadDocuments,
-} from '../services/api/quotationApi'
-import type { UploadedDocument } from '../types/quotation'
+import { deleteDocument, getLatestCompletedTrainingJob, getTrainingJob, listDocuments, startTraining, uploadDocuments } from '../services/api/quotationApi'
+import type { TrainingJob, UploadedDocument } from '../types/quotation'
 import { useQuoteHistory } from './useQuoteHistory'
+import { toTrainingStageView } from '../utils/trainingProgress'
 const TRAINING_POLL_MS = 850
 const TOAST_AUTO_CLOSE_MS = 2000
 function toErrorMessage(error: unknown): string {
@@ -27,6 +21,7 @@ export function useQuotationMvp(authToken: string | null) {
   const [trainedDocumentIds, setTrainedDocumentIds] = useState<string[] | null>(null)
   const [trainingReadyAt, setTrainingReadyAt] = useState<string | null>(null)
   const [trainingJobId, setTrainingJobId] = useState<string | null>(null)
+  const [latestTrainingJobState, setLatestTrainingJobState] = useState<TrainingJob | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const trainingTimerRef = useRef<number | null>(null)
   const errorTimerRef = useRef<number | null>(null)
@@ -79,15 +74,11 @@ export function useQuotationMvp(authToken: string | null) {
   const showTrainingPanel =
     isTraining || isUploading || (documents.length > 0 && (!modelReady || hasPendingTrainingChanges))
   const canTrain = hasPendingTrainingChanges && !isTraining && !isUploading
-  useEffect(
-    () => () => {
-      clearTrainingPolling()
-      if (errorTimerRef.current !== null) {
-        window.clearTimeout(errorTimerRef.current)
-      }
-    },
-    [clearTrainingPolling],
-  )
+  const trainingStages = useMemo(() => toTrainingStageView(latestTrainingJobState), [latestTrainingJobState])
+  useEffect(() => () => {
+    clearTrainingPolling()
+    if (errorTimerRef.current !== null) window.clearTimeout(errorTimerRef.current)
+  }, [clearTrainingPolling])
   useEffect(() => {
     if (!authToken) {
       clearRunningState()
@@ -98,6 +89,7 @@ export function useQuotationMvp(authToken: string | null) {
       setTrainedDocumentIds(null)
       setTrainingReadyAt(null)
       setTrainingJobId(null)
+      setLatestTrainingJobState(null)
       clearQuoteHistory()
       return
     }
@@ -115,10 +107,12 @@ export function useQuotationMvp(authToken: string | null) {
           setTrainingJobId(null)
           setTrainedDocumentIds(null)
           setTrainingReadyAt(null)
+          setLatestTrainingJobState(null)
           return
         }
         setTrainingProgress(100)
         setTrainingJobId(latestTrainingJob.id)
+        setLatestTrainingJobState(latestTrainingJob)
         setTrainedDocumentIds(latestTrainingJob.documentIds)
         setTrainingReadyAt(toDisplayDate(latestTrainingJob.completedAt ?? latestTrainingJob.updatedAt))
       } catch (error) {
@@ -191,6 +185,7 @@ export function useQuotationMvp(authToken: string | null) {
         }
         const job = await getTrainingJob(activeToken, jobId)
         setTrainingProgress(job.progress)
+        setLatestTrainingJobState(job)
         if (job.status === 'completed') {
           clearRunningState()
           setTrainingProgress(100)
@@ -219,6 +214,7 @@ export function useQuotationMvp(authToken: string | null) {
       const job = await startTraining(authToken, currentDocumentIds)
       setTrainingJobId(job.id)
       setTrainingProgress(job.progress)
+      setLatestTrainingJobState(job)
       setTrainingReadyAt(null)
       pollTrainingStatus(job.id)
     } catch (error) {
@@ -230,6 +226,7 @@ export function useQuotationMvp(authToken: string | null) {
     documents: pendingDocuments,
     trainingProgress,
     trainingStatus,
+    trainingStages,
     isTraining,
     isUploading,
     canTrain,

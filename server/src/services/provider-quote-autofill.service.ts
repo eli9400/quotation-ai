@@ -1,7 +1,8 @@
 import { buildQuoteFromLineItems } from './quote-breakdown.service.js'
-import { listLearnedPricingItems } from './dynamic-form-schema.service.js'
 import { exactMatchUnitPrice, estimateUnitPriceLinear } from './line-pricing-utils.service.js'
+import { listProviderPricingItemsWithIndustryBaseline } from './pricing-items-source.service.js'
 import { estimateBinnedMedianPrice } from './pricing-engine-utils.service.js'
+import { getServiceProviderByUid } from './service-providers.service.js'
 import type { LearnedPricingItem } from '../types/model-profile.js'
 import type { GeneratedQuote, QuoteLineItem } from '../types/quote.js'
 
@@ -139,7 +140,11 @@ export async function autofillQuoteLinePricesFromTraining(
     return quote
   }
 
-  const learnedItems = await listLearnedPricingItems(serviceProviderUid)
+  const profile = await getServiceProviderByUid(serviceProviderUid)
+  const learnedItems = await listProviderPricingItemsWithIndustryBaseline(
+    serviceProviderUid,
+    profile?.industry ?? '',
+  )
   if (learnedItems.length === 0) {
     return quote
   }

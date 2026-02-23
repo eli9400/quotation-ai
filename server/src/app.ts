@@ -4,6 +4,7 @@ import multer from 'multer'
 import { env } from './config/env.js'
 import { documentsRouter } from './routes/documents.route.js'
 import { healthRouter } from './routes/health.route.js'
+import { modelLineItemsRouter } from './routes/model-line-items.route.js'
 import { modelRouter } from './routes/model.route.js'
 import { providerQuotesRouter } from './routes/provider-quotes.route.js'
 import { quotesRouter } from './routes/quotes.route.js'
@@ -21,6 +22,7 @@ app.use('/api', serviceProvidersRouter)
 app.use('/api', documentsRouter)
 app.use('/api', trainingRouter)
 app.use('/api', modelRouter)
+app.use('/api', modelLineItemsRouter)
 app.use('/api', quotesRouter)
 app.use('/api', providerQuotesRouter)
 app.use('/api', vehicleCatalogRouter)

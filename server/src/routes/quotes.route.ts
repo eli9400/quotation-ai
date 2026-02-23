@@ -157,11 +157,13 @@ quotesRouter.get('/public/provider-line-items/by-code/:serviceProviderCode', asy
 
     const items = await listProviderLineItemOptions(serviceProvider.uid)
     const clientItems = items
-      .filter((item) => !item.isProviderOnly)
+      .filter((item) => !item.isProviderOnly && item.visibleToClient)
       .map((item) => ({
         sourceItemId: item.id,
-        label: item.canonicalName || item.label,
+        label: item.clientLabel || item.canonicalName || item.label,
         unit: item.unit,
+        categoryId: item.categoryId,
+        categoryLabel: item.categoryLabel,
       }))
 
     res.status(200).json({ ok: true, items: clientItems })

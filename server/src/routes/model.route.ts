@@ -7,7 +7,6 @@ import {
   listServiceProviderFeaturesWithSuggestions,
   upsertServiceProviderFeature,
 } from '../services/service-provider-features.service.js'
-import { listProviderLineItemOptions } from '../services/provider-line-items.service.js'
 import { getServiceProviderByCode } from '../services/service-providers.service.js'
 import { getTrainingDatasetStats } from '../services/training-dataset.service.js'
 import type { CustomFeatureValueType } from '../types/custom-feature.js'
@@ -187,19 +186,6 @@ modelRouter.get('/model/form-preview', requireAuth, async (req, res, next) => {
     res.status(200).json({
       ok: true,
       schema,
-    })
-  } catch (error) {
-    next(error)
-  }
-})
-
-modelRouter.get('/model/provider-line-items', requireAuth, async (req, res, next) => {
-  try {
-    const authReq = req as AuthenticatedRequest
-    const items = await listProviderLineItemOptions(authReq.authUser.uid)
-    res.status(200).json({
-      ok: true,
-      items,
     })
   } catch (error) {
     next(error)

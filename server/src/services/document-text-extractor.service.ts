@@ -1,9 +1,8 @@
-import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import mammoth from 'mammoth'
 import { PDFParse } from 'pdf-parse'
 import * as XLSX from 'xlsx'
-import { env } from '../config/env.js'
+import { downloadDocumentBufferFromStorage } from './document-storage.service.js'
 import { extractDocumentPricingContext } from './document-pricing-context.service.js'
 import {
   extractQuoteDateFromFileName,
@@ -39,11 +38,6 @@ function normalizeText(rawText: string): string {
     .trim()
 }
 
-function resolveStoredFilePath(storedName: string): string {
-  const safeFileName = path.basename(storedName)
-  return path.join(env.uploadsDir, safeFileName)
-}
-
 function detectFormat(
   file: StoredDocument,
 ): ExtractedDocumentText['detectedFormat'] | null {
@@ -74,8 +68,7 @@ function detectFormat(
   return null
 }
 
-async function extractPdfText(filePath: string): Promise<string> {
-  const fileBuffer = await readFile(filePath)
+async function extractPdfText(fileBuffer: Buffer): Promise<string> {
   const parser = new PDFParse({ data: fileBuffer })
   try {
     const parsed = await parser.getText()
@@ -85,8 +78,8 @@ async function extractPdfText(filePath: string): Promise<string> {
   }
 }
 
-async function extractDocxText(filePath: string): Promise<string> {
-  const result = await mammoth.extractRawText({ path: filePath })
+async function extractDocxText(fileBuffer: Buffer): Promise<string> {
+  const result = await mammoth.extractRawText({ buffer: fileBuffer })
   return normalizeText(result.value || '')
 }
 
@@ -111,8 +104,7 @@ function worksheetToText(sheet: XLSX.WorkSheet): string {
     .join('\n')
 }
 
-async function extractSpreadsheetText(filePath: string): Promise<string> {
-  const fileBuffer = await readFile(filePath)
+async function extractSpreadsheetText(fileBuffer: Buffer): Promise<string> {
   const workbook = XLSX.read(fileBuffer, { type: 'buffer', raw: false })
   const allSheetText = workbook.SheetNames.map((sheetName) => {
     const sheet = workbook.Sheets[sheetName]
@@ -140,15 +132,17 @@ export async function extractTextFromStoredDocument(
       `Unsupported document format: ${document.originalName}. Supported: PDF, DOCX, XLS, XLSX, CSV.`,
     )
   }
-
-  const filePath = resolveStoredFilePath(document.storedName)
+  const fileBuffer = await downloadDocumentBufferFromStorage(
+    document.serviceProviderUid,
+    document.storedName,
+  )
   let text = ''
   if (format === 'pdf') {
-    text = await extractPdfText(filePath)
+    text = await extractPdfText(fileBuffer)
   } else if (format === 'docx') {
-    text = await extractDocxText(filePath)
+    text = await extractDocxText(fileBuffer)
   } else {
-    text = await extractSpreadsheetText(filePath)
+    text = await extractSpreadsheetText(fileBuffer)
   }
 
   return {

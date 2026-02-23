@@ -18,7 +18,8 @@ function estimateEta(elapsedMs: number, progress: number): string | null {
   return formatDuration(remainingMs)
 }
 
-function describeStage(progress: number): string {
+function describeStage(progress: number, currentStage?: string): string {
+  if (currentStage) return currentStage
   if (progress < 12) return 'preparing'
   if (progress < 34) return 'loading-documents'
   if (progress < 58) return 'extracting-text'
@@ -50,7 +51,7 @@ export async function runWithProgressLogging(
         return
       }
       const elapsedMs = Date.now() - startedAt
-      const stage = describeStage(job.progress)
+      const stage = describeStage(job.progress, job.currentStage)
       const eta = estimateEta(elapsedMs, job.progress)
       const stateKey = `${job.status}:${job.progress}:${job.errorMessage ?? ''}`
       const shouldLog =

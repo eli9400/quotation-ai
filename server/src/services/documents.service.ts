@@ -1,7 +1,9 @@
-import path from 'node:path'
-import { env } from '../config/env.js'
 import { getFirestoreDb } from '../config/firebase.js'
-import { calculateFileHashFromPath, deleteFileIfExists } from './document-hash.service.js'
+import { calculateFileHashFromBuffer } from './document-hash.service.js'
+import {
+  deleteDocumentObjectIfExists,
+  downloadDocumentBufferFromStorage,
+} from './document-storage.service.js'
 import type { StoredDocument } from '../types/document.js'
 
 const DOCUMENTS_COLLECTION = 'documents'
@@ -34,10 +36,6 @@ function normalizeStoredDocument(docId: string, raw: RawStoredDocument): StoredD
   }
 }
 
-function resolveStoredFilePath(storedName: string): string {
-  return path.join(env.uploadsDir, path.basename(storedName))
-}
-
 async function persistFileHash(documentId: string, fileHash: string): Promise<void> {
   const db = getFirestoreDb()
   await db.collection(DOCUMENTS_COLLECTION).doc(documentId).set({ fileHash }, { merge: true })
@@ -49,7 +47,11 @@ async function ensureDocumentHash(document: StoredDocument): Promise<StoredDocum
   }
 
   try {
-    const fileHash = await calculateFileHashFromPath(resolveStoredFilePath(document.storedName))
+    const fileBuffer = await downloadDocumentBufferFromStorage(
+      document.serviceProviderUid,
+      document.storedName,
+    )
+    const fileHash = calculateFileHashFromBuffer(fileBuffer)
     await persistFileHash(document.id, fileHash)
     return {
       ...document,
@@ -156,10 +158,6 @@ export async function getStoredDocumentById(
   return documents[0] ?? null
 }
 
-async function removeStoredFile(storedName: string): Promise<void> {
-  await deleteFileIfExists(resolveStoredFilePath(storedName))
-}
-
 export async function deleteStoredDocument(
   serviceProviderUid: string,
   documentId: string,
@@ -169,7 +167,7 @@ export async function deleteStoredDocument(
     return false
   }
 
-  await removeStoredFile(existing.storedName)
+  await deleteDocumentObjectIfExists(serviceProviderUid, existing.storedName)
   const db = getFirestoreDb()
   await db.collection(DOCUMENTS_COLLECTION).doc(documentId).delete()
   return true
