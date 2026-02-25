@@ -17,6 +17,8 @@ type UpdateClientDisplayBody = {
 type RawConfig = {
   sourceItemId?: unknown
   customLabel?: unknown
+  categoryId?: unknown
+  categoryLabel?: unknown
   visibleToClient?: unknown
 }
 
@@ -37,6 +39,10 @@ function parseConfigs(body: UpdateClientDisplayBody): UpsertProviderLineItemDisp
     parsed.push({
       sourceItemId: candidate.sourceItemId.trim(),
       customLabel: typeof candidate.customLabel === 'string' ? candidate.customLabel : null,
+      customCategoryId:
+        typeof candidate.categoryId === 'string' ? candidate.categoryId : null,
+      customCategoryLabel:
+        typeof candidate.categoryLabel === 'string' ? candidate.categoryLabel : null,
       visibleToClient:
         typeof candidate.visibleToClient === 'boolean' ? candidate.visibleToClient : true,
     })
@@ -87,7 +93,8 @@ modelLineItemsRouter.patch('/model/provider-line-items/client-config', requireAu
     if (!configs) {
       res.status(400).json({
         ok: false,
-        message: 'configs must be an array of {sourceItemId, customLabel, visibleToClient}.',
+        message:
+          'configs must be an array of {sourceItemId, customLabel, categoryId, categoryLabel, visibleToClient}.',
       })
       return
     }

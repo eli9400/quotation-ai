@@ -1,20 +1,22 @@
-import type { FormPreviewSchema } from '../../types/quotation'
-import { Panel } from '../ui/Panel'
+import type { FormPreviewSchema } from "../../types/quotation";
+import { Panel } from "../ui/Panel";
 
 type ClientFormPreviewPanelProps = {
-  schema: FormPreviewSchema | null
-  isLoading: boolean
+  schema: FormPreviewSchema | null;
+  isLoading: boolean;
+};
+
+function isClientVisibleField(
+  field: FormPreviewSchema["fields"][number],
+): boolean {
+  return !field.visibleTo || field.visibleTo === "client";
 }
 
-function isClientVisibleField(field: FormPreviewSchema['fields'][number]): boolean {
-  return !field.visibleTo || field.visibleTo === 'client'
-}
-
-function renderPreviewControl(field: FormPreviewSchema['fields'][number]) {
-  if (field.type === 'textarea') {
-    return <textarea disabled rows={3} placeholder={field.placeholder ?? ''} />
+function renderPreviewControl(field: FormPreviewSchema["fields"][number]) {
+  if (field.type === "textarea") {
+    return <textarea disabled rows={3} placeholder={field.placeholder ?? ""} />;
   }
-  if (field.type === 'select') {
+  if (field.type === "select") {
     return (
       <select disabled defaultValue="">
         <option value="">בחרו</option>
@@ -24,26 +26,29 @@ function renderPreviewControl(field: FormPreviewSchema['fields'][number]) {
           </option>
         ))}
       </select>
-    )
+    );
   }
   return (
     <input
       disabled
-      type={field.type === 'number' ? 'number' : 'text'}
-      placeholder={field.placeholder ?? ''}
+      type={field.type === "number" ? "number" : "text"}
+      placeholder={field.placeholder ?? ""}
     />
-  )
+  );
 }
 
 function schemaDescription(schema: FormPreviewSchema | null): string {
   if (!schema) {
-    return 'התצוגה תופיע אחרי אימון ראשון או כשיש מודל שמור.'
+    return "התצוגה תופיע אחרי אימון ראשון או כשיש מודל שמור.";
   }
-  const generatedAt = new Date(schema.generatedAt).toLocaleString('he-IL')
-  return `הרכיבים ללקוח נטענים לפי קטגוריות. רכיבים זמינים להוספה: ${schema.sourceItemsCount}. עדכון: ${generatedAt}.`
+  const generatedAt = new Date(schema.generatedAt).toLocaleString("he-IL");
+  return `הרכיבים ללקוח נטענים לפי קטגוריות ...  ${schema.sourceItemsCount} רכיבים זמינים להוספה: . עדכון: ${generatedAt}.`;
 }
 
-export function ClientFormPreviewPanel({ schema, isLoading }: ClientFormPreviewPanelProps) {
+export function ClientFormPreviewPanel({
+  schema,
+  isLoading,
+}: ClientFormPreviewPanelProps) {
   return (
     <Panel title="תצוגת טופס לקוח" description={schemaDescription(schema)}>
       {isLoading ? (
@@ -60,7 +65,7 @@ export function ClientFormPreviewPanel({ schema, isLoading }: ClientFormPreviewP
               <label key={field.id}>
                 <span>
                   {field.label}
-                  {field.required ? ' *' : ''}
+                  {field.required ? " *" : ""}
                 </span>
                 {renderPreviewControl(field)}
               </label>
@@ -68,5 +73,5 @@ export function ClientFormPreviewPanel({ schema, isLoading }: ClientFormPreviewP
         </form>
       )}
     </Panel>
-  )
+  );
 }

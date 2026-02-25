@@ -1,6 +1,8 @@
 import { env } from '../../config/env'
 import type {
   ClientRequestForm,
+  DocumentTextExtraction,
+  DocumentValidationStatus,
   Quote,
   QuoteSource,
   StoredQuoteRecord,
@@ -18,6 +20,20 @@ type UploadDocumentsResponse = {
     mimeType: string
     size: number
     uploadedAt: string
+  }>
+}
+
+type ExtractDocumentsTextResponse = {
+  ok: boolean
+  documents: Array<{
+    id: string
+    originalName: string
+    textChars: number
+    preview: string
+    validationStatus?: 'valid' | 'corrupted'
+    validationReason?: string | null
+    heuristicLineItems?: number
+    signalScore?: number
   }>
 }
 
@@ -92,6 +108,13 @@ function toUiDocument(document: UploadDocumentsResponse['documents'][number]): U
   }
 }
 
+function toValidationStatus(
+  status: ExtractDocumentsTextResponse['documents'][number]['validationStatus'],
+): DocumentValidationStatus {
+  if (status === 'valid' || status === 'corrupted') return status
+  return 'unchecked'
+}
+
 export async function uploadDocuments(
   idToken: string,
   files: File[],
@@ -130,6 +153,34 @@ export async function deleteDocument(
   return payload.deletedId
 }
 
+export async function extractDocumentsText(
+  idToken: string,
+  documentIds: string[],
+): Promise<DocumentTextExtraction[]> {
+  if (documentIds.length === 0) return []
+  const payload = await requestJson<ExtractDocumentsTextResponse>(apiUrl('/documents/extract-text'), {
+    method: 'POST',
+    body: JSON.stringify({ documentIds }),
+    headers: {
+      ...authHeaders(idToken),
+      'Content-Type': 'application/json',
+    },
+  })
+
+  return payload.documents.map((document) => ({
+    id: document.id,
+    name: decodeLikelyMojibake(document.originalName),
+    textChars: document.textChars,
+    preview: document.preview,
+    validation: {
+      status: toValidationStatus(document.validationStatus),
+      reason: document.validationReason ?? null,
+      heuristicLineItems: document.heuristicLineItems ?? 0,
+      signalScore: document.signalScore ?? 0,
+    },
+  }))
+}
+
 export async function startTraining(
   idToken: string,
   documentIds: string[],
@@ -162,6 +213,28 @@ export async function getLatestCompletedTrainingJob(
   })
   return payload.job
 }
+
+export async function getLatestRunningTrainingJob(
+  idToken: string,
+): Promise<TrainingJob | null> {
+  try {
+    const payload = await requestJson<GetLatestTrainingResponse>(
+      apiUrl('/training/latest-running'),
+      {
+        method: 'GET',
+        headers: authHeaders(idToken),
+      },
+    )
+    return payload.job
+  } catch (error) {
+    // Backward-compatible fallback while backend without /training/latest-running is still deployed.
+    if (error instanceof Error && /status 404/i.test(error.message)) {
+      return null
+    }
+    throw error
+  }
+}
+
 export async function generateQuote(
   idToken: string,
   trainingJobId: string,

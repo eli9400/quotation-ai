@@ -26,6 +26,8 @@ type ProviderLineItemDisplayConfigsResponse = {
   configs: Array<{
     sourceItemId: string
     customLabel: string | null
+    customCategoryId: string | null
+    customCategoryLabel: string | null
     hiddenFromClient: boolean
   }>
 }
@@ -54,6 +56,8 @@ type DeleteProviderLineItemResponse = {
 export type ProviderLineItemDisplayConfig = {
   sourceItemId: string
   customLabel: string | null
+  categoryId: string | null
+  categoryLabel: string | null
   visibleToClient: boolean
 }
 
@@ -117,6 +121,9 @@ export async function getProviderLineItemDisplayConfigs(
   return payload.configs.map((config) => ({
     sourceItemId: config.sourceItemId,
     customLabel: typeof config.customLabel === 'string' ? config.customLabel : null,
+    categoryId: typeof config.customCategoryId === 'string' ? config.customCategoryId : null,
+    categoryLabel:
+      typeof config.customCategoryLabel === 'string' ? config.customCategoryLabel : null,
     visibleToClient: !config.hiddenFromClient,
   }))
 }
@@ -133,6 +140,8 @@ export async function saveProviderLineItemDisplayConfigs(
         configs: configs.map((config) => ({
           sourceItemId: config.sourceItemId,
           customLabel: config.customLabel,
+          categoryId: config.categoryId,
+          categoryLabel: config.categoryLabel,
           visibleToClient: config.visibleToClient,
         })),
       }),
@@ -145,6 +154,9 @@ export async function saveProviderLineItemDisplayConfigs(
   return payload.configs.map((config) => ({
     sourceItemId: config.sourceItemId,
     customLabel: typeof config.customLabel === 'string' ? config.customLabel : null,
+    categoryId: typeof config.customCategoryId === 'string' ? config.customCategoryId : null,
+    categoryLabel:
+      typeof config.customCategoryLabel === 'string' ? config.customCategoryLabel : null,
     visibleToClient: !config.hiddenFromClient,
   }))
 }

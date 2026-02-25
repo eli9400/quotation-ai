@@ -1,4 +1,4 @@
-import { categorizeProviderLineItem } from './provider-line-item-categories.service.js'
+import { categorizeProviderLineItem, resolveDynamicCategoryForLineItem } from './provider-line-item-categories.service.js'
 import { listExcludedProviderLineItemIds } from './provider-line-item-exclusions.service.js'
 import { getCatalogLineItemsForIndustry } from './provider-line-items.catalog.js'
 import { isSoftNearDuplicateName } from './provider-line-items-duplicates.service.js'
@@ -17,6 +17,7 @@ export type ProviderLineItemOption = {
   clientLabel: string
   categoryId: string
   categoryLabel: string
+  isCategoryOverridden: boolean
   unit: PricingUnit
   aliases: string[]
   sampleLines: number
@@ -26,143 +27,106 @@ export type ProviderLineItemOption = {
   sourceType: ProviderLineItemSourceType
 }
 
-const SOURCE_PRIORITY: Record<ProviderLineItemSourceType, number> = {
-  provider: 3,
-  industry: 2,
-  catalog: 1,
+type LineItemOverride = {
+  customLabel: string | null
+  hiddenFromClient: boolean
+  customCategoryId: string | null
+  customCategoryLabel: string | null
 }
 
-const PROVIDER_ONLY_PATTERNS = [
-  /vat/i,
-  /total/i,
-  /subtotal/i,
-  /payment/i,
-  /advance/i,
-  /discount/i,
-  /management/i,
-  /percent/i,
-]
-
+const SOURCE_PRIORITY: Record<ProviderLineItemSourceType, number> = { provider: 3, industry: 2, catalog: 1 }
+const PROVIDER_ONLY_PATTERNS = [/vat/i, /total/i, /subtotal/i, /payment/i, /advance/i, /discount/i, /management/i, /percent/i]
 const CLIENT_UNITS = new Set<PricingUnit>(['sqm', 'unit', 'point', 'container', 'package', 'meter'])
+const GENERAL_LABEL = 'שירותים כלליים'
 
 function normalizeLabel(label: string): string {
   return label.replace(/\s+/g, ' ').trim()
 }
 
 function normalizeForKey(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[+/_-]+/g, ' ')
-    .replace(/[^a-z0-9\u0590-\u05ff\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
+  return value.toLowerCase().replace(/[+/_-]+/g, ' ').replace(/[^a-z0-9\u0590-\u05ff\s]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 function isNearDuplicateName(left: string, right: string): boolean {
   if (!left || !right || left === right) return false
-  const leftWords = left.split(' ').filter((word) => word.length > 0)
-  const rightWords = right.split(' ').filter((word) => word.length > 0)
+  const leftWords = left.split(' ').filter(Boolean)
+  const rightWords = right.split(' ').filter(Boolean)
   if (leftWords.length < 2 || rightWords.length < 2) return false
   const shorter = left.length <= right.length ? left : right
   const longer = left.length <= right.length ? right : left
   if (shorter.length >= 8 && longer.includes(shorter)) return true
   const rightSet = new Set(rightWords)
   const intersection = leftWords.filter((word) => rightSet.has(word)).length
-  const minWords = Math.min(leftWords.length, rightWords.length)
-  return intersection >= minWords && Math.abs(leftWords.length - rightWords.length) <= 1
-}
-
-function findGroupedKey(
-  grouped: Map<string, ProviderLineItemOption>,
-  canonicalName: string,
-  unit: PricingUnit,
-  sourceType: ProviderLineItemSourceType,
-): string {
-  const normalizedName = normalizeForKey(canonicalName)
-  const exactKey = `${normalizedName}|${unit}`
-  if (grouped.has(exactKey)) return exactKey
-  for (const key of grouped.keys()) {
-    const separatorIndex = key.lastIndexOf('|')
-    if (separatorIndex <= 0) continue
-    const groupedName = key.slice(0, separatorIndex)
-    const groupedUnit = key.slice(separatorIndex + 1) as PricingUnit
-    if (groupedUnit !== unit) continue
-    const groupedOption = grouped.get(key)
-    if (!groupedOption) continue
-    if (isNearDuplicateName(groupedName, normalizedName)) return key
-    if (
-      isSoftNearDuplicateName(
-        canonicalName,
-        groupedOption.canonicalName,
-        sourceType,
-        groupedOption.sourceType,
-      )
-    ) {
-      return key
-    }
-  }
-  return exactKey
+  return intersection >= Math.min(leftWords.length, rightWords.length) && Math.abs(leftWords.length - rightWords.length) <= 1
 }
 
 function isProviderOnly(unit: PricingUnit, label: string): boolean {
-  if (!CLIENT_UNITS.has(unit)) return true
-  return PROVIDER_ONLY_PATTERNS.some((pattern) => pattern.test(label))
+  return !CLIENT_UNITS.has(unit) || PROVIDER_ONLY_PATTERNS.some((pattern) => pattern.test(label))
 }
 
 function resolveDisplayUnit(unit: PricingUnit, label: string): PricingUnit {
-  if (unit === 'unknown' && !PROVIDER_ONLY_PATTERNS.some((pattern) => pattern.test(label))) {
-    return 'unit'
-  }
-  return unit
+  return unit === 'unknown' && !PROVIDER_ONLY_PATTERNS.some((pattern) => pattern.test(label)) ? 'unit' : unit
 }
 
 function buildDisplayLabel(label: string, unit: PricingUnit): string {
   return `${normalizeLabel(label)} (${unit})`
 }
 
-function toPricingOption(item: ProviderPricingItem): ProviderLineItemOption {
-  const primaryAlias = item.aliases?.find((value) => value.trim().length > 0)
-  const canonicalName = normalizeLabel(primaryAlias || item.canonicalName)
-  const displayUnit = resolveDisplayUnit(item.unit, canonicalName)
+function createOption(params: {
+  id: string
+  sourceType: ProviderLineItemSourceType
+  canonicalName: string
+  unit: PricingUnit
+  aliases: string[]
+  sampleLines: number
+  quantityPriceSamples: Array<{ quantity: number; unitPrice: number }>
+}): ProviderLineItemOption {
+  const canonicalName = normalizeLabel(params.canonicalName)
+  const displayUnit = resolveDisplayUnit(params.unit, canonicalName)
   const providerOnly = isProviderOnly(displayUnit, canonicalName)
   return {
-    id: item.id,
+    id: params.id,
     label: buildDisplayLabel(canonicalName, displayUnit),
     canonicalName,
     clientLabel: canonicalName,
     categoryId: 'general',
-    categoryLabel: 'שירותים כלליים',
+    categoryLabel: GENERAL_LABEL,
+    isCategoryOverridden: false,
     unit: displayUnit,
-    aliases: item.aliases ?? [],
-    sampleLines: item.sampleLines,
-    quantityPriceSamples: item.quantityPriceSamples ?? [],
+    aliases: params.aliases,
+    sampleLines: params.sampleLines,
+    quantityPriceSamples: params.quantityPriceSamples,
     isProviderOnly: providerOnly,
     visibleToClient: !providerOnly,
-    sourceType: item.sourceType,
+    sourceType: params.sourceType,
   }
 }
 
+function toPricingOption(item: ProviderPricingItem): ProviderLineItemOption {
+  const canonicalName = item.aliases?.find((value) => value.trim().length > 0) ?? item.canonicalName
+  return createOption({
+    id: item.id,
+    sourceType: item.sourceType,
+    canonicalName,
+    unit: item.unit,
+    aliases: item.aliases ?? [],
+    sampleLines: item.sampleLines,
+    quantityPriceSamples: item.quantityPriceSamples ?? [],
+  })
+}
+
 function toCatalogOptions(industry: string, industryLabel: string, categoryId: string): ProviderLineItemOption[] {
-  return getCatalogLineItemsForIndustry(industry, industryLabel, categoryId).map((item) => {
-    const canonicalName = normalizeLabel(item.name)
-    const displayUnit = resolveDisplayUnit(item.unit, canonicalName)
-    const providerOnly = isProviderOnly(displayUnit, canonicalName)
-    return {
+  return getCatalogLineItemsForIndustry(industry, industryLabel, categoryId).map((item) =>
+    createOption({
       id: `catalog_${categoryId}_${item.key}`,
-      label: buildDisplayLabel(canonicalName, displayUnit),
-      canonicalName,
-      clientLabel: canonicalName,
-      categoryId: 'general',
-      categoryLabel: 'שירותים כלליים',
-      unit: displayUnit,
+      sourceType: 'catalog',
+      canonicalName: item.name,
+      unit: item.unit,
       aliases: item.aliases ?? [],
       sampleLines: 0,
       quantityPriceSamples: [],
-      isProviderOnly: providerOnly,
-      visibleToClient: !providerOnly,
-      sourceType: 'catalog',
-    }
-  })
+    }),
+  )
 }
 
 function pickPreferredOption(current: ProviderLineItemOption, next: ProviderLineItemOption): ProviderLineItemOption {
@@ -170,54 +134,64 @@ function pickPreferredOption(current: ProviderLineItemOption, next: ProviderLine
   const nextPriority = SOURCE_PRIORITY[next.sourceType]
   if (nextPriority > currentPriority) return next
   if (nextPriority < currentPriority) return current
-  if (next.sampleLines > current.sampleLines) return next
-  return current
+  return next.sampleLines > current.sampleLines ? next : current
+}
+
+function findGroupedKey(grouped: Map<string, ProviderLineItemOption>, option: ProviderLineItemOption): string {
+  const normalizedName = normalizeForKey(option.canonicalName)
+  const exactKey = `${normalizedName}|${option.unit}`
+  if (grouped.has(exactKey)) return exactKey
+  for (const [key, groupedOption] of grouped.entries()) {
+    const separatorIndex = key.lastIndexOf('|')
+    if (separatorIndex <= 0) continue
+    if (key.slice(separatorIndex + 1) !== option.unit) continue
+    const groupedName = key.slice(0, separatorIndex)
+    if (isNearDuplicateName(groupedName, normalizedName)) return key
+    if (isSoftNearDuplicateName(option.canonicalName, groupedOption.canonicalName, option.sourceType, groupedOption.sourceType)) return key
+  }
+  return exactKey
 }
 
 function dedupeOptions(options: ProviderLineItemOption[]): ProviderLineItemOption[] {
   const grouped = new Map<string, ProviderLineItemOption>()
   options.forEach((option) => {
-    const key = findGroupedKey(grouped, option.canonicalName, option.unit, option.sourceType)
+    const key = findGroupedKey(grouped, option)
     const existing = grouped.get(key)
-    if (!existing) {
-      grouped.set(key, option)
-      return
-    }
+    if (!existing) return void grouped.set(key, option)
     const preferred = pickPreferredOption(existing, option)
-    const aliases = Array.from(new Set([...existing.aliases, ...option.aliases])).filter(Boolean)
-    const quantityPriceSamples = [...existing.quantityPriceSamples, ...option.quantityPriceSamples]
     grouped.set(key, {
       ...preferred,
-      aliases,
+      aliases: Array.from(new Set([...existing.aliases, ...option.aliases])).filter(Boolean),
       sampleLines: Math.max(existing.sampleLines, option.sampleLines),
-      quantityPriceSamples,
+      quantityPriceSamples: [...existing.quantityPriceSamples, ...option.quantityPriceSamples],
     })
   })
   return Array.from(grouped.values())
 }
 
-function applyDisplayOverrides(
-  options: ProviderLineItemOption[],
-  overrides: Map<string, { customLabel: string | null; hiddenFromClient: boolean }>,
-): ProviderLineItemOption[] {
+function assignCategories(options: ProviderLineItemOption[], industry: string, categoryId: string): ProviderLineItemOption[] {
   return options.map((option) => {
-    const override = overrides.get(option.id)
-    const customLabel = normalizeLabel(override?.customLabel ?? '') || option.canonicalName
-    const visibleToClient = !option.isProviderOnly && !(override?.hiddenFromClient ?? false)
-    return { ...option, clientLabel: customLabel, visibleToClient }
+    const base = categorizeProviderLineItem({ industry, categoryId, canonicalName: option.canonicalName, unit: option.unit, isProviderOnly: option.isProviderOnly })
+    const dynamic = resolveDynamicCategoryForLineItem({ canonicalName: option.canonicalName, currentCategoryId: base.id })
+    const resolved = dynamic ?? base
+    return { ...option, categoryId: resolved.id, categoryLabel: resolved.label }
   })
 }
 
-function assignCategories(options: ProviderLineItemOption[], industry: string, categoryId: string): ProviderLineItemOption[] {
+function applyDisplayOverrides(options: ProviderLineItemOption[], overrides: Map<string, LineItemOverride>): ProviderLineItemOption[] {
   return options.map((option) => {
-    const category = categorizeProviderLineItem({
-      industry,
-      categoryId,
-      canonicalName: option.canonicalName,
-      unit: option.unit,
-      isProviderOnly: option.isProviderOnly,
-    })
-    return { ...option, categoryId: category.id, categoryLabel: category.label }
+    const override = overrides.get(option.id)
+    const customLabel = normalizeLabel(override?.customLabel ?? '')
+    const customCategoryLabel = normalizeLabel(override?.customCategoryLabel ?? '')
+    const customCategoryId = normalizeLabel(override?.customCategoryId ?? '')
+    return {
+      ...option,
+      clientLabel: customLabel || option.canonicalName,
+      visibleToClient: !option.isProviderOnly && !(override?.hiddenFromClient ?? false),
+      categoryId: customCategoryLabel ? customCategoryId || `manual_${normalizeForKey(customCategoryLabel).replace(/\s+/g, '_')}` : option.categoryId,
+      categoryLabel: customCategoryLabel || option.categoryLabel,
+      isCategoryOverridden: Boolean(customCategoryLabel),
+    }
   })
 }
 
@@ -229,17 +203,13 @@ export async function listProviderLineItemOptions(serviceProviderUid: string): P
     listProviderLineItemDisplayOverridesMap(serviceProviderUid),
     listExcludedProviderLineItemIds(serviceProviderUid),
   ])
-  const merged = dedupeOptions([
-    ...pricingItems.map(toPricingOption),
-    ...toCatalogOptions(industryMeta.value, industryMeta.label, industryMeta.categoryId),
-  ])
-  return assignCategories(applyDisplayOverrides(merged, overrides), industryMeta.value, industryMeta.categoryId)
+  const merged = dedupeOptions([...pricingItems.map(toPricingOption), ...toCatalogOptions(industryMeta.value, industryMeta.label, industryMeta.categoryId)])
+  return applyDisplayOverrides(assignCategories(merged, industryMeta.value, industryMeta.categoryId), overrides)
     .filter((item) => !excludedItemIds.has(item.id))
     .filter((item) => item.canonicalName.length > 0)
     .sort((left, right) => {
       if (right.sampleLines !== left.sampleLines) return right.sampleLines - left.sampleLines
       const priorityDelta = SOURCE_PRIORITY[right.sourceType] - SOURCE_PRIORITY[left.sourceType]
-      if (priorityDelta !== 0) return priorityDelta
-      return left.label.localeCompare(right.label, 'he')
+      return priorityDelta !== 0 ? priorityDelta : left.label.localeCompare(right.label, 'he')
     })
 }

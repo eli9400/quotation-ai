@@ -8,6 +8,8 @@ export type ProviderLineItemDisplayOverride = {
   serviceProviderUid: string
   sourceItemId: string
   customLabel: string | null
+  customCategoryId: string | null
+  customCategoryLabel: string | null
   hiddenFromClient: boolean
   createdAt: string
   updatedAt: string
@@ -16,6 +18,8 @@ export type ProviderLineItemDisplayOverride = {
 export type UpsertProviderLineItemDisplayOverrideInput = {
   sourceItemId: string
   customLabel: string | null
+  customCategoryId?: string | null
+  customCategoryLabel?: string | null
   visibleToClient: boolean
 }
 
@@ -39,14 +43,22 @@ function buildDocId(serviceProviderUid: string, sourceItemId: string): string {
   return `${serviceProviderUid}_${digest}`
 }
 
+function toManualCategoryId(label: string): string {
+  return `manual_${label.toLowerCase().replace(/[^a-z0-9\u0590-\u05ff]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 48)}`
+}
+
 function normalizeInput(
   input: UpsertProviderLineItemDisplayOverrideInput,
 ): UpsertProviderLineItemDisplayOverrideInput | null {
   const sourceItemId = input.sourceItemId?.trim()
   if (!sourceItemId) return null
+  const customCategoryLabel = normalizeLabel(input.customCategoryLabel)
+  const customCategoryId = normalizeLabel(input.customCategoryId)
   return {
     sourceItemId,
     customLabel: normalizeLabel(input.customLabel),
+    customCategoryId: customCategoryLabel ? customCategoryId || toManualCategoryId(customCategoryLabel) : null,
+    customCategoryLabel,
     visibleToClient: input.visibleToClient,
   }
 }
@@ -106,7 +118,10 @@ export async function upsertProviderLineItemDisplayOverrides(
 
   normalizedInputs.forEach((input) => {
     const existingOverride = existing.get(input.sourceItemId)
-    const shouldDelete = !input.customLabel && input.visibleToClient
+    const shouldDelete =
+      !input.customLabel &&
+      !input.customCategoryLabel &&
+      input.visibleToClient
     const docId = existingOverride?.id ?? buildDocId(serviceProviderUid, input.sourceItemId)
     const ref = db.collection(SERVICE_PROVIDER_LINE_ITEM_OVERRIDES_COLLECTION).doc(docId)
 
@@ -122,6 +137,8 @@ export async function upsertProviderLineItemDisplayOverrides(
       serviceProviderUid,
       sourceItemId: input.sourceItemId,
       customLabel: input.customLabel,
+      customCategoryId: input.customCategoryId ?? null,
+      customCategoryLabel: input.customCategoryLabel ?? null,
       hiddenFromClient: !input.visibleToClient,
       createdAt: existingOverride?.createdAt ?? timestamp,
       updatedAt: timestamp,

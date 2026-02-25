@@ -4,6 +4,7 @@ import { requireAuth } from '../middlewares/auth.middleware.js'
 import { documentsUpload } from '../middlewares/upload.middleware.js'
 import { processUploadedDocuments } from '../services/document-upload.service.js'
 import { extractTextFromDocuments } from '../services/document-text-extractor.service.js'
+import { assessExtractedDocumentIntegrity } from '../services/document-integrity.service.js'
 import {
   deleteStoredDocument,
   getStoredDocumentsByIds,
@@ -134,15 +135,25 @@ documentsRouter.post('/documents/extract-text', requireAuth, async (req, res, ne
 
     const storedDocuments = await getStoredDocumentsByIds(authReq.authUser.uid, resolvedIds)
     const extracted = await extractTextFromDocuments(storedDocuments)
-    const responseDocuments = extracted.map((item) => ({
-      id: item.documentId,
-      originalName: normalizeOriginalFileName(item.originalName),
-      format: item.detectedFormat,
-      quoteDate: item.quoteDate,
-      pricingContext: item.pricingContext,
-      textChars: item.text.length,
-      preview: item.text.slice(0, 260),
-    }))
+    const integrityById = new Map(
+      extracted.map((item) => [item.documentId, assessExtractedDocumentIntegrity(item)]),
+    )
+    const responseDocuments = extracted.map((item) => {
+      const integrity = integrityById.get(item.documentId)
+      return {
+        id: item.documentId,
+        originalName: normalizeOriginalFileName(item.originalName),
+        format: item.detectedFormat,
+        quoteDate: item.quoteDate,
+        pricingContext: item.pricingContext,
+        textChars: item.text.length,
+        preview: item.text.slice(0, 260),
+        validationStatus: integrity?.status ?? 'valid',
+        validationReason: integrity?.reason ?? null,
+        heuristicLineItems: integrity?.heuristicLineItems ?? 0,
+        signalScore: integrity?.signalScore ?? 0,
+      }
+    })
 
     res.status(200).json({
       ok: true,

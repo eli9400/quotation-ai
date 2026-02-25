@@ -22,14 +22,68 @@
 
 .empty { margin-top: 0.8rem !important; font-size: 0.92rem; }
 
+.doc-validation-summary {
+  margin-top: 0.8rem !important;
+  font-size: 0.84rem;
+}
+
+.doc-list-actions {
+  margin-top: 0.8rem;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.doc-clear-btn {
+  border: 1px solid #e6d2b4;
+  background: #fff8ef;
+  color: #8a5f2b;
+  border-radius: 10px;
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.doc-clear-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .doc-list {
   margin: 0.8rem 0 0; padding: 0; list-style: none; display: grid; gap: 0.5rem;
   max-height: 560px; overflow-y: auto; padding-inline-end: 0.35rem;
 }
 
-.doc-list li {
+.doc-list-item {
   display: flex; justify-content: space-between; align-items: flex-start; gap: 0.8rem;
   background: #f8fffc; border: 1px solid #dceee7; border-radius: 12px; padding: 0.7rem;
+}
+
+.doc-list-item.corrupted { border-color: #efb9b9; background: #fff8f8; }
+.doc-list-item.valid { border-color: #bde6d5; }
+
+.doc-meta-row {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.doc-validation-badge {
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.doc-validation-badge.valid { background: #e6f8f0; color: #176f53; }
+.doc-validation-badge.checking { background: #ecf3ff; color: #2858a9; }
+.doc-validation-badge.corrupted { background: #ffe8e8; color: #9a2d2d; }
+.doc-validation-badge.unchecked { background: #f4f0e8; color: #7a6437; }
+
+.doc-validation-reason {
+  margin-top: 0.35rem !important;
+  font-size: 0.8rem;
+  color: #9a2d2d !important;
 }
 
 .doc-list p { color: var(--text-strong); font-weight: 600; margin: 0; word-break: break-word; }
@@ -48,48 +102,6 @@
 
 .progress-fill { height: 100%; background: linear-gradient(90deg, #0f725c, #2fa187); transition: width 0.35s ease; }
 .progress-value { margin-top: 0.45rem !important; font-size: 0.86rem; }
-
-.training-stage-list {
-  margin-top: 0.75rem;
-  max-height: 260px;
-  overflow-y: auto;
-  padding-inline-end: 0.35rem;
-  display: grid;
-  gap: 0.55rem;
-}
-
-.training-stage-item {
-  border: 1px solid #dcebe5;
-  border-radius: 10px;
-  padding: 0.5rem 0.65rem;
-  background: rgba(255, 255, 255, 0.7);
-}
-
-.training-stage-item.active {
-  border-color: #8fc6b5;
-  background: #f4fffb;
-}
-
-.training-stage-item.done {
-  border-color: #b5d7cc;
-}
-
-.training-stage-label {
-  margin: 0 !important;
-  color: var(--text-strong) !important;
-  font-size: 0.86rem;
-  font-weight: 700;
-}
-
-.training-stage-item .progress-track {
-  margin-top: 0.4rem;
-  height: 0.55rem;
-}
-
-.training-stage-item .progress-value {
-  margin-top: 0.25rem !important;
-  font-size: 0.78rem;
-}
 
 .quote-form { margin-top: 0.45rem; display: grid; gap: 0.45rem; }
 .quote-form label { color: var(--text-strong); font-weight: 600; font-size: 0.92rem; }

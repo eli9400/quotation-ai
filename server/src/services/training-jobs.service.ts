@@ -105,6 +105,18 @@ async function listTrainingJobsByField(fieldName: string, serviceProviderUid: st
     .filter((job): job is TrainingJob => job !== null)
 }
 
+async function listUniqueTrainingJobsByServiceProvider(
+  serviceProviderUid: string,
+): Promise<TrainingJob[]> {
+  const [newJobs, legacyJobs] = await Promise.all([
+    listTrainingJobsByField('serviceProviderUid', serviceProviderUid),
+    listTrainingJobsByField('contractorUid', serviceProviderUid),
+  ])
+  const uniqueJobs = new Map<string, TrainingJob>()
+  ;[...newJobs, ...legacyJobs].forEach((job) => uniqueJobs.set(job.id, job))
+  return Array.from(uniqueJobs.values())
+}
+
 export async function createTrainingJob(
   serviceProviderUid: string,
   documentIds: string[],
@@ -146,13 +158,8 @@ export async function getTrainingJob(jobId: string): Promise<TrainingJob | null>
 export async function getLatestCompletedTrainingJobByServiceProvider(
   serviceProviderUid: string,
 ): Promise<TrainingJob | null> {
-  const [newJobs, legacyJobs] = await Promise.all([
-    listTrainingJobsByField('serviceProviderUid', serviceProviderUid),
-    listTrainingJobsByField('contractorUid', serviceProviderUid),
-  ])
-  const uniqueJobs = new Map<string, TrainingJob>()
-  ;[...newJobs, ...legacyJobs].forEach((job) => uniqueJobs.set(job.id, job))
-  const completedJobs = Array.from(uniqueJobs.values()).filter((job) => job.status === 'completed')
+  const jobs = await listUniqueTrainingJobsByServiceProvider(serviceProviderUid)
+  const completedJobs = jobs.filter((job) => job.status === 'completed')
   if (completedJobs.length === 0) {
     return null
   }
@@ -162,6 +169,18 @@ export async function getLatestCompletedTrainingJobByServiceProvider(
     return bTimestamp.localeCompare(aTimestamp)
   })
   return completedJobs[0]
+}
+
+export async function getLatestRunningTrainingJobByServiceProvider(
+  serviceProviderUid: string,
+): Promise<TrainingJob | null> {
+  const jobs = await listUniqueTrainingJobsByServiceProvider(serviceProviderUid)
+  const runningJobs = jobs.filter((job) => job.status === 'running')
+  if (runningJobs.length === 0) {
+    return null
+  }
+  runningJobs.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  return runningJobs[0]
 }
 
 export async function updateTrainingJobProgress(

@@ -98,6 +98,8 @@ async function syncOverridesAfterMerge(
   const updates: Array<{
     sourceItemId: string
     customLabel: string | null
+    customCategoryId?: string | null
+    customCategoryLabel?: string | null
     visibleToClient: boolean
   }> = []
 
@@ -105,6 +107,8 @@ async function syncOverridesAfterMerge(
     updates.push({
       sourceItemId,
       customLabel: null,
+      customCategoryId: null,
+      customCategoryLabel: null,
       visibleToClient: true,
     })
   }
@@ -113,6 +117,8 @@ async function syncOverridesAfterMerge(
     updates.push({
       sourceItemId: targetItemId,
       customLabel: sourceOverride.customLabel,
+      customCategoryId: sourceOverride.customCategoryId ?? null,
+      customCategoryLabel: sourceOverride.customCategoryLabel ?? null,
       visibleToClient: !sourceOverride.hiddenFromClient,
     })
   }

@@ -11,6 +11,28 @@ type CategoryRule = {
   pattern: RegExp
 }
 
+const DYNAMIC_STOP_WORDS = new Set([
+  'החלפה',
+  'החלפת',
+  'תיקון',
+  'בדיקה',
+  'שירות',
+  'טיפול',
+  'עבודת',
+  'עבודה',
+  'כולל',
+  'עם',
+  'בלי',
+  'לפי',
+  'של',
+  'for',
+  'with',
+  'service',
+  'repair',
+  'replace',
+  'check',
+])
+
 const AUTO_RULES: CategoryRule[] = [
   { id: 'diagnostics', label: 'אבחון', pattern: /(אבחון|דיאגנוסט|בדיקת מחשב|scan|diagnostic)/i },
   { id: 'brakes', label: 'בלמים', pattern: /(בלמ|רפיד|דיסק)/i },
@@ -92,6 +114,29 @@ function resolveRules(industry: string, categoryId: string): CategoryRule[] {
   return []
 }
 
+function shouldPromoteDynamicCategory(categoryId: string): boolean {
+  return categoryId === 'general' || categoryId.startsWith('general_')
+}
+
+function extractDynamicCategoryTokens(canonicalName: string): string[] {
+  return canonicalName
+    .toLowerCase()
+    .replace(/[+/_-]+/g, ' ')
+    .replace(/[^a-z0-9\u0590-\u05ff\s]/g, ' ')
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 2 && !DYNAMIC_STOP_WORDS.has(token))
+}
+
+function toDynamicCategoryId(tokens: string[]): string {
+  const raw = tokens.slice(0, 2).join('_')
+  return `dynamic_${raw.replace(/[^a-z0-9\u0590-\u05ff_]/g, '_').slice(0, 48)}`
+}
+
+function toDynamicCategoryLabel(tokens: string[]): string {
+  return tokens.slice(0, 2).join(' ')
+}
+
 export function categorizeProviderLineItem(params: {
   industry: string
   categoryId: string
@@ -107,4 +152,25 @@ export function categorizeProviderLineItem(params: {
   const category = rules.find((rule) => rule.pattern.test(params.canonicalName)) ?? null
   if (category) return { id: category.id, label: category.label }
   return fallbackCategory(params.categoryId, params.unit)
+}
+
+export function resolveDynamicCategoryForLineItem(params: {
+  canonicalName: string
+  currentCategoryId: string
+}): ProviderLineItemCategory | null {
+  if (!shouldPromoteDynamicCategory(params.currentCategoryId)) {
+    return null
+  }
+  const tokens = extractDynamicCategoryTokens(params.canonicalName)
+  if (tokens.length === 0) {
+    return null
+  }
+  const label = toDynamicCategoryLabel(tokens)
+  if (!label) {
+    return null
+  }
+  return {
+    id: toDynamicCategoryId(tokens),
+    label,
+  }
 }

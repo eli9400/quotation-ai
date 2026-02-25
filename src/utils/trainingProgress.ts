@@ -16,14 +16,14 @@ export const TRAINING_STAGE_ORDER: TrainingStage[] = [
 ]
 
 const TRAINING_STAGE_LABELS: Record<TrainingStage, string> = {
-  prepare: '\u05d4\u05db\u05e0\u05d4',
-  load_documents: '\u05d8\u05e2\u05d9\u05e0\u05ea \u05de\u05e1\u05de\u05db\u05d9\u05dd',
-  extract_text: '\u05d7\u05d9\u05dc\u05d5\u05e5 \u05d8\u05e7\u05e1\u05d8',
-  parse_pricing_lines: '\u05d0\u05d9\u05ea\u05d5\u05e8 \u05e8\u05db\u05d9\u05d1\u05d9 \u05ea\u05de\u05d7\u05d5\u05e8',
-  build_dataset: '\u05d1\u05e0\u05d9\u05d9\u05ea \u05de\u05d0\u05d2\u05e8 \u05d0\u05d9\u05de\u05d5\u05df',
-  learn_items: '\u05dc\u05de\u05d9\u05d3\u05ea \u05e8\u05db\u05d9\u05d1\u05d9\u05dd',
-  normalize_schema: '\u05e0\u05d9\u05e8\u05de\u05d5\u05dc \u05d5\u05d1\u05e0\u05d9\u05d9\u05ea \u05d8\u05d5\u05e4\u05e1',
-  finalize: '\u05e1\u05d9\u05d5\u05dd',
+  prepare: 'הכנה',
+  load_documents: 'טעינת מסמכים',
+  extract_text: 'חילוץ טקסט',
+  parse_pricing_lines: 'איתור רכיבי תמחור',
+  build_dataset: 'בניית מאגר אימון',
+  learn_items: 'למידת רכיבים',
+  normalize_schema: 'נרמול ובניית טופס',
+  finalize: 'סיום',
 }
 
 function clampPercent(value: number): number {

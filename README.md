@@ -281,6 +281,7 @@ gcloud storage buckets create gs://quotation-ai-1934f-documents `
 From repo root:
 
 ```powershell
+cd C:\Users\eli92\project\quotation-ai
 gcloud run deploy quotation-ai-api `
   --source ".\server" `
   --region us-central1 `
@@ -289,6 +290,7 @@ gcloud run deploy quotation-ai-api `
   --service-account quotation-ai-api@quotation-ai-1934f.iam.gserviceaccount.com `
   --set-secrets OPENAI_API_KEY=openai-api-key:latest `
   --set-env-vars "NODE_ENV=production,WEB_ORIGIN=http://localhost:5173,FIREBASE_PROJECT_ID=quotation-ai-1934f,FIREBASE_STORAGE_BUCKET=quotation-ai-1934f-documents,FIREBASE_USE_ADC=true,UPLOADS_DIR=/tmp/uploads,UPLOADS_MAX_MB=10,CLIENT_FORM_MAX_ITEMS=120,OPENAI_MODEL=gpt-4.1-mini,OPENAI_BASE_URL=https://api.openai.com/v1"
+
 ```
 
 Get URL:

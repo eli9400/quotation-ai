@@ -37,14 +37,17 @@ function App() {
     trainingStages,
     isTraining,
     isUploading,
+    isValidatingDocuments,
     canTrain,
     modelReady,
     showTrainingPanel,
     quoteHistory,
     isLoadingQuotes,
     errorMessage,
+    documentValidationById,
     addDocuments,
     removeDocument,
+    clearDocuments,
     startTraining,
   } = useQuotationMvp(idToken)
   const formPreview = useClientFormPreview(idToken, `${modelReady}-${formPreviewRefreshTick}`)
@@ -84,9 +87,12 @@ function App() {
           <section className="content-grid">
             <DocumentsPanel
               documents={documents}
+              documentValidationById={documentValidationById}
               isUploading={isUploading}
+              isValidatingDocuments={isValidatingDocuments}
               onFilesSelected={addDocuments}
               onRemoveDocument={removeDocument}
+              onClearDocuments={clearDocuments}
             />
             <div className="model-column">
               {showTrainingPanel ? (
@@ -95,6 +101,8 @@ function App() {
                   progress={trainingProgress}
                   stages={trainingStages}
                   isTraining={isTraining}
+                  isUploading={isUploading}
+                  isValidatingDocuments={isValidatingDocuments}
                   canTrain={canTrain}
                   onStartTraining={startTraining}
                 />
@@ -103,10 +111,12 @@ function App() {
                 schema={formPreview.schema}
                 isLoading={formPreview.isLoading}
               />
-              <ClientFormItemsEditorPanel
-                authToken={idToken}
-                onSaved={() => setFormPreviewRefreshTick((current) => current + 1)}
-              />
+              {isTraining ? null : (
+                <ClientFormItemsEditorPanel
+                  authToken={idToken}
+                  onSaved={() => setFormPreviewRefreshTick((current) => current + 1)}
+                />
+              )}
             </div>
           </section>
 

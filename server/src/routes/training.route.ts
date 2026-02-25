@@ -9,6 +9,7 @@ import { runLearningTrainingJob } from '../services/training-learning.service.js
 import {
   createTrainingJob,
   getLatestCompletedTrainingJobByServiceProvider,
+  getLatestRunningTrainingJobByServiceProvider,
   getTrainingJob,
 } from '../services/training-jobs.service.js'
 import { listUploadedDocumentIdsInDataset } from '../services/training-dataset.service.js'
@@ -46,6 +47,19 @@ trainingRouter.post('/training/start', requireAuth, async (req, res, next) => {
       res.status(400).json({
         ok: false,
         message: 'documentIds must be an array of strings.',
+      })
+      return
+    }
+
+    const runningJob = await getLatestRunningTrainingJobByServiceProvider(
+      authReq.authUser.uid,
+    )
+    if (runningJob) {
+      res.status(409).json({
+        ok: false,
+        message:
+          'A training job is already running. Wait for it to complete before starting a new run.',
+        job: runningJob,
       })
       return
     }
@@ -138,6 +152,19 @@ trainingRouter.get('/training/latest', requireAuth, async (req, res, next) => {
   try {
     const authReq = req as AuthenticatedRequest
     const job = await getLatestCompletedTrainingJobByServiceProvider(authReq.authUser.uid)
+    res.status(200).json({
+      ok: true,
+      job,
+    })
+  } catch (error) {
+    next(error)
+  }
+})
+
+trainingRouter.get('/training/latest-running', requireAuth, async (req, res, next) => {
+  try {
+    const authReq = req as AuthenticatedRequest
+    const job = await getLatestRunningTrainingJobByServiceProvider(authReq.authUser.uid)
     res.status(200).json({
       ok: true,
       job,

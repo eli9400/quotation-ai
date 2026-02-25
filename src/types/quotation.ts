@@ -12,6 +12,23 @@ export type UploadedDocument = {
   uploadedAt: string
 }
 
+export type DocumentValidationStatus = 'unchecked' | 'checking' | 'valid' | 'corrupted'
+
+export type DocumentValidation = {
+  status: DocumentValidationStatus
+  reason: string | null
+  heuristicLineItems: number
+  signalScore: number
+}
+
+export type DocumentTextExtraction = {
+  id: string
+  name: string
+  textChars: number
+  preview: string
+  validation: DocumentValidation
+}
+
 export type Quote = {
   lineItems: QuoteLineItem[]
   customFields: QuoteCustomField[]
@@ -147,6 +164,7 @@ export type ProviderLineItemOption = {
   clientLabel: string
   categoryId: string
   categoryLabel: string
+  isCategoryOverridden: boolean
   unit: string
   aliases: string[]
   sampleLines: number
