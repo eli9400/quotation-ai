@@ -6,7 +6,9 @@ import { buildDynamicFormSchema } from './dynamic-form-schema.service.js'
 import { learnPricingItemsFromObservations } from './pricing-items-learning.service.js'
 import { normalizePricingItemsForServiceProvider } from './pricing-items-normalization.service.js'
 import { normalizeObservationsForTraining } from './pricing-observation-normalizer.service.js'
+import { validateObservationsForTraining } from './pricing-observation-validation.service.js'
 import { extractPricingObservations } from './pricing-observation-parser.service.js'
+import { buildTrainingAuditReport } from './training-audit.service.js'
 import { rebuildTrainingDatasetFromObservations } from './training-dataset.service.js'
 import {
   completeTrainingJob,
@@ -138,10 +140,21 @@ export async function runLearningTrainingJob(params: RunTrainingParams): Promise
     )
     const observationsRaw =
       aiParsed && aiParsed.length > 0 ? aiParsed : parsed.observations
-    const normalizedObservations = normalizeObservationsForTraining(observationsRaw)
+    const validation = validateObservationsForTraining(observationsRaw)
+    console.info(
+      `[training] validation gate: input=${validation.stats.input}, kept=${validation.stats.kept}, dropped=${validation.stats.dropped}, genericName=${validation.stats.droppedByReason.generic_name}, invalidUnit=${validation.stats.droppedByReason.invalid_unit}, invalidQuantity=${validation.stats.droppedByReason.invalid_quantity}, invalidPrice=${validation.stats.droppedByReason.invalid_price}, invalidLineTotal=${validation.stats.droppedByReason.invalid_line_total}, extremeHigh=${validation.stats.droppedByReason.extreme_price_high}, extremeLow=${validation.stats.droppedByReason.extreme_price_low}`,
+    )
+    if (validation.observations.length === 0) {
+      throw new Error(
+        'No valid pricing line-items remained after validation. Upload cleaner quote files and retry.',
+      )
+    }
+    const normalizedObservations = normalizeObservationsForTraining(validation.observations)
     const observations = await adjustObservationsByCurrentCpi(normalizedObservations, {
       applyToPrices: false,
     })
+    const audit = buildTrainingAuditReport(observations, validation.stats)
+    console.info(`[training] audit report: ${JSON.stringify(audit)}`)
 
     if (observations.length === 0) {
       throw new Error(

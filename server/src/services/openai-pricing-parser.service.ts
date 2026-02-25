@@ -4,6 +4,7 @@ import type { PricingUnit } from '../types/model-profile.js'
 import type { PricingObservation } from '../types/pricing-observation.js'
 import type { ExtractedDocumentText } from './document-text-extractor.service.js'
 import { buildObservation, detectUnit } from './pricing-parser-utils.service.js'
+import { mapUnitToken } from './pricing-unit-utils.service.js'
 
 type OpenAiRawItem = {
   rawName?: unknown
@@ -46,37 +47,8 @@ function parseNumber(value: unknown): number | null {
 
 function normalizeUnit(value: unknown, fallbackLine: string): PricingUnit {
   if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase()
-    if (normalized === 'sqm' || normalized === 'm2' || normalized === 'm"ר') {
-      return 'sqm'
-    }
-    if (normalized === 'point' || normalized === 'points') {
-      return 'point'
-    }
-    if (normalized === 'day' || normalized === 'days') {
-      return 'day'
-    }
-    if (normalized === 'container' || normalized === 'containers') {
-      return 'container'
-    }
-    if (normalized === 'package') {
-      return 'package'
-    }
-    if (normalized === 'percent' || normalized === '%') {
-      return 'percent'
-    }
-    if (normalized === 'unit' || normalized === 'pcs') {
-      return 'unit'
-    }
-    if (normalized === 'hour') {
-      return 'hour'
-    }
-    if (normalized === 'meter') {
-      return 'meter'
-    }
-    if (normalized === 'fixed') {
-      return 'fixed'
-    }
+    const mapped = mapUnitToken(value)
+    if (mapped) return mapped
     return detectUnit(value)
   }
   return detectUnit(fallbackLine)

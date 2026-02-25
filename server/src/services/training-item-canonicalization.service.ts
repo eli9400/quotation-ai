@@ -8,6 +8,30 @@ const AUTOMOTIVE_INDUSTRIES = new Set<string>([
   'auto_mechanic',
   'auto_body_technician',
 ])
+const GLOBAL_AREA_KEYWORDS = [
+  'דשא',
+  'קרקע',
+  'ערוג',
+  'ניכוש',
+  'עשב',
+  'חיפוי',
+  'טוף',
+  'סקאריפיקציה',
+  'אוורור',
+  'שבילים',
+  'מרצפות',
+  'הדחת',
+  'תשתית',
+  'ניקוי עלים',
+  'שטח',
+  'מרובע',
+  'sqm',
+  'm2',
+  'square',
+]
+const GLOBAL_METER_KEYWORDS = ['גיזום', 'גדר', 'טפטוף', 'השקיה', 'צינור', 'קו', 'meter']
+const GLOBAL_FIXED_KEYWORDS = ['מחיר קבוע', 'ייעוץ', 'תכנון', 'הדברה', 'איתור נזילה', 'תיקון', 'fixed']
+const GLOBAL_TRANSPORT_KEYWORDS = ['פינוי', 'גזם', 'פסולת', 'הובלה', 'transport', 'waste']
 
 const NORMALIZE_WORDS: Array<{ pattern: RegExp; replacement: string }> = [
   { pattern: /מסננים?/gi, replacement: 'פילטר' },
@@ -64,6 +88,49 @@ function collapseRepeatedWords(value: string): string {
   return output.join(' ')
 }
 
+function includesAny(value: string, patterns: string[]): boolean {
+  return patterns.some((pattern) => value.includes(pattern))
+}
+
+function inferUnknownUnitFromName(key: string): PricingUnit {
+  if (key.includes('ביקור') || key.includes('visit') || key.includes('point')) return 'point'
+  if (key.includes('שעה') || key.includes('hour')) return 'hour'
+  if (key.includes('יום') || key.includes('day')) return 'day'
+  if (key.includes('אחוז') || key.includes('percent') || key.includes('%')) return 'percent'
+  if (key.includes('מכול') || key.includes('container')) return 'container'
+  if (key.includes('קומפלט') || key.includes('package') || includesAny(key, GLOBAL_TRANSPORT_KEYWORDS)) {
+    return 'package'
+  }
+  if (includesAny(key, GLOBAL_FIXED_KEYWORDS)) return 'fixed'
+  if (key.includes('מ ר') || key.includes('ר מ') || key.includes('sqm') || key.includes('m2')) {
+    return 'sqm'
+  }
+  if (includesAny(key, GLOBAL_AREA_KEYWORDS)) return 'sqm'
+  if (key.includes('מטר') || includesAny(key, GLOBAL_METER_KEYWORDS)) return 'meter'
+  return 'unit'
+}
+
+function normalizeUnitGlobal(unit: SupportedUnit, key: string): SupportedUnit {
+  if (unit === 'custom') return unit
+
+  if (unit === 'meter') {
+    if (includesAny(key, GLOBAL_AREA_KEYWORDS) && !includesAny(key, GLOBAL_METER_KEYWORDS)) {
+      return 'sqm'
+    }
+    return unit
+  }
+
+  if (unit === 'fixed' && includesAny(key, GLOBAL_TRANSPORT_KEYWORDS)) {
+    return 'package'
+  }
+
+  if (unit !== 'unknown') {
+    return unit
+  }
+
+  return inferUnknownUnitFromName(key)
+}
+
 function normalizeAutomotiveName(input: string): string {
   let output = normalizeCommonName(input)
   NORMALIZE_WORDS.forEach(({ pattern, replacement }) => {
@@ -88,16 +155,15 @@ function normalizeUnitForIndustry(
   itemName: string,
   industry: string,
 ): SupportedUnit {
-  if (unit === 'custom' || !AUTOMOTIVE_INDUSTRIES.has(industry)) return unit
-  if (unit !== 'unknown' && unit !== 'fixed') return unit
-
   const key = normalizeNameForKey(itemName)
-  if (key.includes('שעה') || key.includes('hour')) return 'hour'
-  if (key.includes('יום') || key.includes('day')) return 'day'
-  if (key.includes('אחוז') || key.includes('percent') || key.includes('%')) return 'percent'
-  if (key.includes('מטר') || key.includes('meter')) return 'meter'
-  if (key.includes('קומפלט') || key.includes('package')) return 'package'
-  return 'unit'
+  const globalUnit = normalizeUnitGlobal(unit, key)
+
+  if (AUTOMOTIVE_INDUSTRIES.has(industry)) {
+    // Keep an automotive-safe fallback if global policy couldn't infer.
+    return globalUnit === 'unknown' ? 'unit' : globalUnit
+  }
+
+  return globalUnit
 }
 
 export function canonicalizeTrainingItemForIndustry(

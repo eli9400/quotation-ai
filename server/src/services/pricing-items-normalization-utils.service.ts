@@ -1,14 +1,15 @@
 import type { PricingUnit } from '../types/model-profile.js'
 
 const TRAILING_BRACKET_UNIT_PATTERN =
-  /\s*\((מ["׳³']?ר|sqm|m2|יחיד(?:ה|ות)|unit|points?|נקוד(?:ה|ות)|days?|ימים?|containers?|מכול(?:ה|ות)|קומפלט|package|שעות?|hours?|meters?|מטרים?|%|אחוזים?|percent)\)\s*$/gi
+  /\s*\((מ["׳³']?ר|ר["׳³']?מ|sqm|m2|יחיד(?:ה|ות)|unit|points?|visits?|ביקור(?:ים)?|נקוד(?:ה|ות)|days?|ימים?|containers?|מכול(?:ה|ות)|קומפלט|package|שעות?|hours?|meters?|מטרים?|%|אחוזים?|percent)\)\s*$/gi
 const LEADING_UNIT_PATTERN =
-  /^(מ["׳³']?ר|sqm|m2|יחיד(?:ה|ות)|unit|נקוד(?:ה|ות)|points?|ימים?|יום|days?|מכול(?:ה|ות)|containers?|קומפלט|package|שעות?|hours?|מטרים?|meters?|אחוזים?|percent)\s*[:-]?\s+/i
+  /^(מ["׳³']?ר|ר["׳³']?מ|sqm|m2|יחיד(?:ה|ות)|unit|נקוד(?:ה|ות)|points?|visits?|ביקור(?:ים)?|ימים?|יום|days?|מכול(?:ה|ות)|containers?|קומפלט|package|שעות?|hours?|מטרים?|meters?|אחוזים?|percent)\s*[:-]?\s+/i
 const TRAILING_UNIT_WORD_PATTERN =
-  /\s+(מ["׳³']?ר|sqm|m2|יחיד(?:ה|ות)|unit|units|נקוד(?:ה|ות)|points?|ימים?|יום|days?|מכול(?:ה|ות)|containers?|קומפלט|package|שעות?|hour|hours|מטרים?|meters?|אחוזים?|percent)\s*$/i
+  /\s+(מ["׳³']?ר|ר["׳³']?מ|sqm|m2|יחיד(?:ה|ות)|unit|units|נקוד(?:ה|ות)|points?|visits?|ביקור(?:ים)?|ימים?|יום|days?|מכול(?:ה|ות)|containers?|קומפלט|package|שעות?|hour|hours|מטרים?|meters?|אחוזים?|percent)\s*$/i
 
 const UNIT_ONLY_KEYS = new Set([
   'מר',
+  'רמ',
   'm2',
   'sqm',
   'יחידה',
@@ -19,6 +20,10 @@ const UNIT_ONLY_KEYS = new Set([
   'נקודות',
   'point',
   'points',
+  'ביקור',
+  'ביקורים',
+  'visit',
+  'visits',
   'מכולה',
   'מכולות',
   'container',
@@ -40,6 +45,21 @@ const UNIT_ONLY_KEYS = new Set([
   'אחוז',
   'אחוזים',
   'percent',
+])
+const GENERIC_NOISE_KEYS = new Set([
+  'שירות',
+  'שרות',
+  'עבודה',
+  'עבודות',
+  'פריט',
+  'כללי',
+  'שונות',
+  'service',
+  'services',
+  'item',
+  'items',
+  'general',
+  'misc',
 ])
 
 export const UNIT_PRIORITY: Record<PricingUnit, number> = {
@@ -81,12 +101,12 @@ export function pricingCanonicalKey(value: string): string {
 
 export function detectPricingUnitHint(text: string): PricingUnit | null {
   const source = text.toLowerCase()
-  if (/נקוד|point/.test(source)) return 'point'
+  if (/נקוד|point|ביקור|visit/.test(source)) return 'point'
   if (/יום עבודה|ימים?|day/.test(source)) return 'day'
   if (/מכול|container/.test(source)) return 'container'
   if (/קומפלט|package/.test(source)) return 'package'
   if (/%|אחוז|percent/.test(source)) return 'percent'
-  if (/מ["׳³']?ר|sqm|m2/.test(source)) return 'sqm'
+  if (/מ\s*["׳³']?\s*ר|ר\s*["׳³']?\s*מ|sqm|m2/.test(source)) return 'sqm'
   if (/מטר|meter/.test(source)) return 'meter'
   if (/שעה|hours?/.test(source)) return 'hour'
   if (/יחיד|unit|pcs/.test(source)) return 'unit'
@@ -95,5 +115,6 @@ export function detectPricingUnitHint(text: string): PricingUnit | null {
 
 export function isNoisePricingItemName(name: string): boolean {
   if (!name) return true
-  return UNIT_ONLY_KEYS.has(pricingCanonicalKey(name))
+  const key = pricingCanonicalKey(name)
+  return UNIT_ONLY_KEYS.has(key) || GENERIC_NOISE_KEYS.has(key)
 }

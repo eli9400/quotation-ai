@@ -32,8 +32,11 @@ function toDynamicFeatures(quote: StoredQuote) {
   return { values, visibility }
 }
 
-function toExamples(quote: StoredQuote, industry: string | null): TrainingDatasetExample[] {
-  const timestamp = nowIso()
+export function buildApprovedQuoteTrainingExamples(
+  quote: StoredQuote,
+  industry: string | null,
+  timestamp: string = nowIso(),
+): TrainingDatasetExample[] {
   const dynamic = toDynamicFeatures(quote)
 
   return quote.quote.lineItems.map((line) => {
@@ -112,7 +115,7 @@ async function deleteQuoteExamples(serviceProviderUid: string, quoteId: string):
 export async function syncApprovedQuoteToTrainingDataset(quote: StoredQuote): Promise<void> {
   await deleteQuoteExamples(quote.serviceProviderUid, quote.id)
   const serviceProvider = await getServiceProviderByUid(quote.serviceProviderUid)
-  const examples = toExamples(quote, serviceProvider?.industry ?? null)
+  const examples = buildApprovedQuoteTrainingExamples(quote, serviceProvider?.industry ?? null)
   const db = getFirestoreDb()
   const operations = examples.map((example) => (batch: FirebaseFirestore.WriteBatch) => {
     batch.set(db.collection(TRAINING_DATASET_COLLECTION).doc(example.id), example)

@@ -1,11 +1,9 @@
 import { parseFlexibleNumber } from './number-parser.service.js'
 import type { PricingUnit } from '../types/model-profile.js'
 import type { PricingObservation } from '../types/pricing-observation.js'
-import type {
-  DocumentPricingContext,
-  MaterialsMode,
-  VatMode,
-} from '../types/pricing-context.js'
+import type { DocumentPricingContext } from '../types/pricing-context.js'
+import { detectMaterialsModeFromText, detectVatModeFromText } from './document-pricing-context.service.js'
+import { mapUnitToken } from './pricing-unit-utils.service.js'
 
 const PRICE_LABELS = ['מחיר', 'מחיר ליחידה', 'מחיר למ', 'unit price']
 const QUANTITY_LABELS = ['כמות', 'qty', 'quantity']
@@ -24,62 +22,43 @@ const IGNORED_NAME_PATTERNS = [
   /הנחה/i,
   /discount/i,
 ]
+const SQM_STRONG_HINT = /(?:מ\s*["׳'״`]?\s*ר|ר\s*["׳'״`]?\s*מ|sqm|m2|sq\.?\s*m)/giu
+const VISIT_HINT = /(?:ביקור(?:ים)?|visit|visits)/giu
+const METER_WORD_HINT = /(?:מטר(?:ים)?|meters?|lm|למ)/giu
+const METER_SHORT_HINT =
+  /(?:^|[\s()[\]{}:;,.|/-])מ['׳`״]?(?!\s*ר)(?=$|[\s()[\]{}:;,.|/-])/giu
+
 const UNIT_HINTS: Array<{ match: RegExp; unit: PricingUnit }> = [
-  { match: /מ["׳']?ר|מ2|sqm/gi, unit: 'sqm' },
+  { match: SQM_STRONG_HINT, unit: 'sqm' },
   { match: /נקוד(?:ה|ות)?|point|pts?/gi, unit: 'point' },
+  { match: VISIT_HINT, unit: 'point' },
   { match: /יום(?:י עבודה)?|ימים|day|days/gi, unit: 'day' },
   { match: /מכול(?:ה|ות)|container|containers/gi, unit: 'container' },
   { match: /קומפלט|package/gi, unit: 'package' },
   { match: /%|אחוז|percent/gi, unit: 'percent' },
   { match: /יחי?דה|יח׳|unit|pcs/gi, unit: 'unit' },
   { match: /שעה|שעות|hour|hours/gi, unit: 'hour' },
-  { match: /מטר|מ'|meter|meters/gi, unit: 'meter' },
+  { match: METER_WORD_HINT, unit: 'meter' },
+  { match: METER_SHORT_HINT, unit: 'meter' },
   { match: /מחיר קבוע|fixed|lump sum/gi, unit: 'fixed' },
 ]
 const LEADING_UNIT_PATTERN =
-  /^(מ["׳']?ר|מ2|sqm|נקוד(?:ה|ות)?|points?|ימים?|days?|מכול(?:ה|ות)|containers?|קומפלט|package|יחי?דה|יח׳|unit|pcs|שעות?|hours?|מטרים?|meters?|אחוז|percent)\s+/i
+  /^(מ["׳']?ר|ר["׳']?מ|מ2|sqm|נקוד(?:ה|ות)?|ביקור(?:ים)?|points?|visits?|ימים?|days?|מכול(?:ה|ות)|containers?|קומפלט|package|יחי?דה|יח׳|unit|pcs|שעות?|hours?|מטרים?|meters?|אחוז|percent)\s+/i
 const TRAILING_UNIT_PATTERN =
-  /\s*\((מ["׳']?ר|sqm|m2|נקוד(?:ה|ות)?|points?|ימים?|days?|מכול(?:ה|ות)|containers?|קומפלט|package|יחידות?|unit|שעות?|hours?|מטרים?|meters?|%|אחוז|percent)\)\s*$/i
+  /\s*\((מ["׳']?ר|ר["׳']?מ|sqm|m2|נקוד(?:ה|ות)?|ביקור(?:ים)?|points?|visits?|ימים?|days?|מכול(?:ה|ות)|containers?|קומפלט|package|יחידות?|unit|שעות?|hours?|מטרים?|meters?|%|אחוז|percent)\)\s*$/i
 
 export type ObservationBuildContext = Partial<DocumentPricingContext> & {
   sourceQuoteDate?: string | null
 }
 
-const VAT_INCLUDED_PATTERNS = [
-  new RegExp(`כולל\\s*${HEBREW_VAT_PATTERN}`, 'i'),
-  /including\s+vat/i,
-  /prices?\s+include(?:s|d)?\s+vat/i,
-]
-const VAT_EXCLUDED_PATTERNS = [
-  new RegExp(`\\+\\s*${HEBREW_VAT_PATTERN}`, 'i'),
-  new RegExp(`לא\\s*כולל\\s*${HEBREW_VAT_PATTERN}`, 'i'),
-  /\+\s*vat/i,
-  /excluding\s+vat/i,
-]
-const MATERIALS_INCLUDED_PATTERNS = [/כולל\s+חומר(?:ים)?/i, /materials?\s+included/i]
-const MATERIALS_EXCLUDED_PATTERNS = [
-  /לא\s+כולל\s+חומר(?:ים)?/i,
-  /materials?\s+not\s+included/i,
-]
-
-function detectMode(patterns: RegExp[], source: string): boolean {
-  return patterns.some((pattern) => pattern.test(source))
+function resolveVatMode(sourceLine: string, context: ObservationBuildContext): DocumentPricingContext['vatMode'] {
+  const detectedMode = detectVatModeFromText(sourceLine)
+  return detectedMode === 'unknown' ? (context.vatMode ?? 'unknown') : detectedMode
 }
 
-function resolveVatMode(sourceLine: string, context: ObservationBuildContext): VatMode {
-  const included = detectMode(VAT_INCLUDED_PATTERNS, sourceLine)
-  const excluded = detectMode(VAT_EXCLUDED_PATTERNS, sourceLine)
-  if (included && !excluded) return 'included'
-  if (excluded && !included) return 'excluded'
-  return context.vatMode ?? 'unknown'
-}
-
-function resolveMaterialsMode(sourceLine: string, context: ObservationBuildContext): MaterialsMode {
-  const included = detectMode(MATERIALS_INCLUDED_PATTERNS, sourceLine)
-  const excluded = detectMode(MATERIALS_EXCLUDED_PATTERNS, sourceLine)
-  if (included && !excluded) return 'included'
-  if (excluded && !included) return 'excluded'
-  return context.materialsMode ?? 'unknown'
+function resolveMaterialsMode(sourceLine: string, context: ObservationBuildContext): DocumentPricingContext['materialsMode'] {
+  const detectedMode = detectMaterialsModeFromText(sourceLine)
+  return detectedMode === 'unknown' ? (context.materialsMode ?? 'unknown') : detectedMode
 }
 
 function round2(value: number): number {
@@ -116,6 +95,9 @@ export function extractNumbers(line: string): number[] {
 }
 
 export function detectUnit(line: string): PricingUnit {
+  const tokenUnit = mapUnitToken(line)
+  if (tokenUnit) return tokenUnit
+
   for (const hint of UNIT_HINTS) {
     if (hint.match.test(line)) {
       hint.match.lastIndex = 0

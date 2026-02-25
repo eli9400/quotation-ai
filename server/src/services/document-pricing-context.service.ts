@@ -87,7 +87,7 @@ function parseDiscountAmount(source: string): number | null {
   return Math.round(Math.abs(value) * 100) / 100
 }
 
-function detectVatMode(source: string): VatMode {
+export function detectVatModeFromText(source: string): VatMode {
   const included = detectMode(VAT_INCLUDED_PATTERNS, source)
   const excluded = detectMode(VAT_EXCLUDED_PATTERNS, source)
   if (included && !excluded) {
@@ -99,7 +99,7 @@ function detectVatMode(source: string): VatMode {
   return 'unknown'
 }
 
-function detectMaterialsMode(source: string): MaterialsMode {
+export function detectMaterialsModeFromText(source: string): MaterialsMode {
   const included = detectMode(MATERIALS_INCLUDED_PATTERNS, source)
   const excluded = detectMode(MATERIALS_EXCLUDED_PATTERNS, source)
   if (included && !excluded) {
@@ -117,7 +117,7 @@ function normalizeText(rawText: string): string {
 
 export function extractDocumentPricingContext(rawText: string): DocumentPricingContext {
   const text = normalizeText(rawText)
-  const vatMode = detectVatMode(text)
+  const vatMode = detectVatModeFromText(text)
   const vatRateCandidate = parseFirstMatch(VAT_RATE_PATTERNS, text)
   const vatRate = asPercent(vatRateCandidate) ?? (vatMode !== 'unknown' ? 17 : null)
   const discountPercentRaw = parseFirstMatch(DISCOUNT_PERCENT_PATTERNS, text)
@@ -132,6 +132,6 @@ export function extractDocumentPricingContext(rawText: string): DocumentPricingC
     vatRate,
     discountPercent,
     discountAmount,
-    materialsMode: detectMaterialsMode(text),
+    materialsMode: detectMaterialsModeFromText(text),
   }
 }
