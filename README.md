@@ -1,73 +1,128 @@
-# React + TypeScript + Vite
+# 🧠 Quotation AI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+An AI-powered system for analyzing contractor quotations and extracting structured data from unstructured files such as PDFs, Word documents, and spreadsheets.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🎯 Overview
 
-## React Compiler
+Quotation AI is designed to help users analyze and understand contractor quotes by converting messy, unstructured documents into structured, usable data.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The system processes uploaded files and extracts meaningful information such as items, quantities, and pricing, enabling better comparison and decision-making.
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 🧩 Key Features
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+* 📄 Upload and analyze PDF, Word, and Excel files
+* 🔍 Extract structured data from unstructured quotations
+* 📊 Normalize and organize items for comparison
+* ⚡ Backend processing with file parsing and data extraction
+* 🔗 Integration with Firebase for data storage
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+---
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## 🛠️ Tech Stack
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Frontend
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+* React
+* TypeScript
+* Vite
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+### Backend
+
+* Node.js
+* Express
+* TypeScript
+
+### Data Processing
+
+* pdf-parse – PDF parsing
+* mammoth – Word document parsing
+* xlsx – Excel processing
+
+### Infrastructure
+
+* Firebase / Firebase Admin
+* Multer (file uploads)
+* CORS / dotenv
+
+---
+
+## ⚙️ How It Works
+
+1. User uploads a quotation file (PDF, DOCX, Excel)
+2. Backend processes the file using parsing libraries
+3. Extracted data is structured into usable format
+4. Data can be stored and analyzed for insights
+
+---
+
+## 🚀 Getting Started
+
+### 1. Clone the repository
+
+git clone https://github.com/eli9400/quotation-ai.git
+cd quotation-ai
+
+---
+
+### 2. Install dependencies
+
+#### Frontend
+
+npm install
+
+#### Backend
+
+cd server
+npm install
+
+---
+
+### 3. Run the project
+
+#### Start backend
+
+npm run dev
+
+#### Start frontend
+
+npm run dev
+
+---
+
+## 📁 Project Structure
+
+quotation-ai/
+├── src/                # React frontend
+├── server/
+│   ├── src/            # Backend logic
+│   ├── routes/         # API endpoints
+│   └── services/       # File parsing & processing
+
+---
+
+## 💡 Highlights
+
+* Real-world use case: analyzing contractor quotations
+* Handles multiple file formats (PDF, DOCX, XLSX)
+* Combines frontend UI with backend data processing
+* Demonstrates full-stack architecture
+
+---
+
+## 📌 Future Improvements
+
+* AI-based price recommendations
+* Better UI for comparison between quotations
+* Support for additional file formats
+* Advanced analytics and insights
+
+---
+
+## 👤 Author
+
+**Eli Blechman**
+GitHub: https://github.com/eli9400
