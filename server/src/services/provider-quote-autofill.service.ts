@@ -1,11 +1,11 @@
 import { buildQuoteFromLineItems } from './quote-breakdown.service.js'
 import { exactMatchUnitPrice, estimateUnitPriceLinear } from './line-pricing-utils.service.js'
+import { buildModelFeatureRowFromInferenceInput, validateModelFeatureRow } from './model-feature-schema.service.js'
 import { listProviderPricingItemsWithIndustryBaseline } from './pricing-items-source.service.js'
 import { estimateBinnedMedianPrice } from './pricing-engine-utils.service.js'
 import { getServiceProviderByUid } from './service-providers.service.js'
 import type { LearnedPricingItem } from '../types/model-profile.js'
 import type { GeneratedQuote, QuoteLineItem } from '../types/quote.js'
-
 const SIMILARITY_THRESHOLD = 0.34
 
 function round2(value: number): number {
@@ -14,9 +14,7 @@ function round2(value: number): number {
 
 function normalizeUnit(unit: string): string {
   const normalized = unit.trim().toLowerCase()
-  if (normalized === '%' || normalized === 'pct') {
-    return 'percent'
-  }
+  if (normalized === '%' || normalized === 'pct') return 'percent'
   return normalized
 }
 
@@ -42,9 +40,7 @@ function tokenizeLabel(value: string): Set<string> {
 }
 
 function tokenSimilarity(left: Set<string>, right: Set<string>): number {
-  if (left.size === 0 || right.size === 0) {
-    return 0
-  }
+  if (left.size === 0 || right.size === 0) return 0
   let intersection = 0
   left.forEach((token) => {
     if (right.has(token)) {
@@ -78,23 +74,15 @@ function similarityScore(line: QuoteLineItem, item: LearnedPricingItem): number 
 
 function estimateUnitPrice(item: LearnedPricingItem, quantity: number): number {
   const exact = exactMatchUnitPrice(item, quantity)
-  if (exact !== null) {
-    return round2(exact)
-  }
+  if (exact !== null) return round2(exact)
   const binned = estimateBinnedMedianPrice(item, quantity)
-  if (binned !== null) {
-    return round2(binned)
-  }
+  if (binned !== null) return round2(binned)
   return round2(estimateUnitPriceLinear(item, quantity))
 }
 
 function needsAutofill(line: QuoteLineItem): boolean {
-  if (isPercentUnit(line.unit)) {
-    return false
-  }
-  if (line.quantity <= 0) {
-    return false
-  }
+  if (isPercentUnit(line.unit)) return false
+  if (line.quantity <= 0) return false
   return line.unitPrice <= 0
 }
 
@@ -156,6 +144,20 @@ export async function autofillQuoteLinePricesFromTraining(
     }
     const item = findBestItem(line, learnedItems)
     if (!item) {
+      return line
+    }
+    const featureRow = buildModelFeatureRowFromInferenceInput({
+      itemKey: null,
+      itemName: item.canonicalName,
+      unit: item.unit,
+      quantity: line.quantity,
+      industry: profile?.industry ?? null,
+    })
+    const featureErrors = validateModelFeatureRow(featureRow)
+    if (featureErrors.length > 0) {
+      console.warn(
+        `[quote-autofill] feature schema validation failed for ${item.id}: ${featureErrors.join(',')}`,
+      )
       return line
     }
     const unitPrice = estimateUnitPrice(item, line.quantity)
