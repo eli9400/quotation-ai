@@ -1,0 +1,57 @@
+.client-option-groups {
+  display: grid;
+  gap: 0.45rem;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid #d8e9e2;
+  border-radius: 10px;
+  padding: 0.5rem;
+  background: #ffffff;
+}
+
+.client-option-group {
+  border: 1px solid #edf3f0;
+  border-radius: 8px;
+  padding: 0.45rem;
+  background: #fbfffd;
+}
+
+.client-option-group header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.35rem;
+}
+
+.client-option-group header small {
+  color: var(--text-soft);
+}
+
+.client-option-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.client-option-tags button {
+  border: 1px solid #d7e7e0;
+  border-radius: 999px;
+  background: #f8fffc;
+  color: var(--text-strong);
+  padding: 0.2rem 0.55rem;
+  font: inherit;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.client-option-tags button.active {
+  border-color: #6aa793;
+  background: #dff3eb;
+  font-weight: 600;
+}
+
+.client-option-tags button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

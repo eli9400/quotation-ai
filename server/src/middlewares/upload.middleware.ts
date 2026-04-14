@@ -25,7 +25,7 @@ const uploadFilter: multer.Options['fileFilter'] = (_req, file, callback) => {
   const hasAllowedMimeType = !file.mimetype || allowedMimeTypes.has(file.mimetype)
   const isValid = hasAllowedExtension && hasAllowedMimeType
   if (!isValid) {
-    callback(new Error('Only PDF, DOC, and DOCX files are allowed.'))
+    callback(new Error('Only PDF, DOC, DOCX, XLS, XLSX, and CSV files are allowed.'))
     return
   }
   callback(null, true)

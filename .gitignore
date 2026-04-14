@@ -16,6 +16,10 @@ dist-ssr
 server/.env
 server/uploads
 *firebase-adminsdk-*.json
+firebase-service-account.json
+server/firebase-service-account.json
+!TODO.md
+!README.md
 
 # Editor directories and files
 .vscode/*

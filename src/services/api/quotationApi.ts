@@ -1,12 +1,16 @@
 import { env } from '../../config/env'
 import type {
   ClientRequestForm,
+  DocumentTextExtraction,
+  DocumentValidationStatus,
   Quote,
   QuoteSource,
+  StoredQuoteRecord,
   TrainingJob,
   UploadedDocument,
 } from '../../types/quotation'
 import { requestJson } from './httpClient'
+import { mapQuoteRecordPayload, type QuoteRecordPayload } from './quoteRecordMapper'
 
 type UploadDocumentsResponse = {
   ok: boolean
@@ -17,6 +21,25 @@ type UploadDocumentsResponse = {
     size: number
     uploadedAt: string
   }>
+}
+
+type ExtractDocumentsTextResponse = {
+  ok: boolean
+  documents: Array<{
+    id: string
+    originalName: string
+    textChars: number
+    preview: string
+    validationStatus?: 'valid' | 'corrupted'
+    validationReason?: string | null
+    heuristicLineItems?: number
+    signalScore?: number
+  }>
+}
+
+type DeleteDocumentResponse = {
+  ok: boolean
+  deletedId: string
 }
 
 type StartTrainingResponse = {
@@ -30,66 +53,224 @@ type GetTrainingResponse = {
   job: TrainingJob
 }
 
+type GetLatestTrainingResponse = {
+  ok: boolean
+  job: TrainingJob | null
+}
+
 type GenerateQuoteResponse = {
   ok: boolean
   source: QuoteSource
   quote: Quote
+  quoteId: string
+}
+
+type ListQuotesResponse = {
+  ok: boolean
+  quotes: QuoteRecordPayload[]
 }
 
 function apiUrl(path: string): string {
   return `${env.apiBaseUrl}${path}`
 }
 
+function authHeaders(idToken: string): HeadersInit {
+  return {
+    Authorization: `Bearer ${idToken}`,
+  }
+}
+
+const MOJIBAKE_MARKERS = /[ÃÂÐÑ×ØÙÚÛÜÝÞß]/g
+const MOJIBAKE_TEST = /[ÃÂÐÑ×ØÙÚÛÜÝÞß]/
+
+function decodeLikelyMojibake(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed || !MOJIBAKE_TEST.test(trimmed)) return trimmed
+  const bytes = Array.from(trimmed).map((char) => char.charCodeAt(0) & 0xff)
+  try {
+    const decoded = new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(bytes)).trim()
+    if (!decoded) return trimmed
+    const originalNoise = (trimmed.match(MOJIBAKE_MARKERS) ?? []).length
+    const decodedNoise = (decoded.match(MOJIBAKE_MARKERS) ?? []).length
+    return decodedNoise < originalNoise ? decoded : trimmed
+  } catch {
+    return trimmed
+  }
+}
+
 function toUiDocument(document: UploadDocumentsResponse['documents'][number]): UploadedDocument {
   return {
     id: document.id,
-    name: document.originalName,
+    name: decodeLikelyMojibake(document.originalName),
     size: document.size,
     type: document.mimeType || 'unknown',
     uploadedAt: new Date(document.uploadedAt).toLocaleString('he-IL'),
   }
 }
 
-export async function uploadDocuments(files: File[]): Promise<UploadedDocument[]> {
+function toValidationStatus(
+  status: ExtractDocumentsTextResponse['documents'][number]['validationStatus'],
+): DocumentValidationStatus {
+  if (status === 'valid' || status === 'corrupted') return status
+  return 'unchecked'
+}
+
+export async function uploadDocuments(
+  idToken: string,
+  files: File[],
+): Promise<UploadedDocument[]> {
   const formData = new FormData()
   files.forEach((file) => formData.append('documents', file))
 
   const payload = await requestJson<UploadDocumentsResponse>(apiUrl('/documents'), {
     method: 'POST',
     body: formData,
+    headers: authHeaders(idToken),
   })
 
   return payload.documents.map(toUiDocument)
 }
 
-export async function startTraining(documentIds: string[]): Promise<TrainingJob> {
+export async function listDocuments(idToken: string): Promise<UploadedDocument[]> {
+  const payload = await requestJson<UploadDocumentsResponse>(apiUrl('/documents'), {
+    method: 'GET',
+    headers: authHeaders(idToken),
+  })
+  return payload.documents.map(toUiDocument)
+}
+
+export async function deleteDocument(
+  idToken: string,
+  documentId: string,
+): Promise<string> {
+  const payload = await requestJson<DeleteDocumentResponse>(
+    apiUrl(`/documents/${encodeURIComponent(documentId)}`),
+    {
+      method: 'DELETE',
+      headers: authHeaders(idToken),
+    },
+  )
+  return payload.deletedId
+}
+
+export async function extractDocumentsText(
+  idToken: string,
+  documentIds: string[],
+): Promise<DocumentTextExtraction[]> {
+  if (documentIds.length === 0) return []
+  const payload = await requestJson<ExtractDocumentsTextResponse>(apiUrl('/documents/extract-text'), {
+    method: 'POST',
+    body: JSON.stringify({ documentIds }),
+    headers: {
+      ...authHeaders(idToken),
+      'Content-Type': 'application/json',
+    },
+  })
+
+  return payload.documents.map((document) => ({
+    id: document.id,
+    name: decodeLikelyMojibake(document.originalName),
+    textChars: document.textChars,
+    preview: document.preview,
+    validation: {
+      status: toValidationStatus(document.validationStatus),
+      reason: document.validationReason ?? null,
+      heuristicLineItems: document.heuristicLineItems ?? 0,
+      signalScore: document.signalScore ?? 0,
+    },
+  }))
+}
+
+export async function startTraining(
+  idToken: string,
+  documentIds: string[],
+): Promise<TrainingJob> {
   const payload = await requestJson<StartTrainingResponse>(apiUrl('/training/start'), {
     method: 'POST',
     body: JSON.stringify({ documentIds }),
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      ...authHeaders(idToken),
+      'Content-Type': 'application/json',
+    },
   })
   return payload.job
 }
 
-export async function getTrainingJob(jobId: string): Promise<TrainingJob> {
+export async function getTrainingJob(idToken: string, jobId: string): Promise<TrainingJob> {
   const payload = await requestJson<GetTrainingResponse>(apiUrl(`/training/${jobId}`), {
     method: 'GET',
+    headers: authHeaders(idToken),
   })
   return payload.job
+}
+
+export async function getLatestCompletedTrainingJob(
+  idToken: string,
+): Promise<TrainingJob | null> {
+  const payload = await requestJson<GetLatestTrainingResponse>(apiUrl('/training/latest'), {
+    method: 'GET',
+    headers: authHeaders(idToken),
+  })
+  return payload.job
+}
+
+export async function getLatestRunningTrainingJob(
+  idToken: string,
+): Promise<TrainingJob | null> {
+  try {
+    const payload = await requestJson<GetLatestTrainingResponse>(
+      apiUrl('/training/latest-running'),
+      {
+        method: 'GET',
+        headers: authHeaders(idToken),
+      },
+    )
+    return payload.job
+  } catch (error) {
+    // Backward-compatible fallback while backend without /training/latest-running is still deployed.
+    if (error instanceof Error && /status 404/i.test(error.message)) {
+      return null
+    }
+    throw error
+  }
 }
 
 export async function generateQuote(
+  idToken: string,
   trainingJobId: string,
   clientRequest: ClientRequestForm,
-): Promise<{ source: QuoteSource; quote: Quote }> {
+): Promise<{ source: QuoteSource; quote: Quote; record: StoredQuoteRecord }> {
   const payload = await requestJson<GenerateQuoteResponse>(apiUrl('/quotes/generate'), {
     method: 'POST',
     body: JSON.stringify({ trainingJobId, clientRequest }),
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      ...authHeaders(idToken),
+      'Content-Type': 'application/json',
+    },
   })
 
   return {
     source: payload.source,
     quote: payload.quote,
+    record: mapQuoteRecordPayload({
+      id: payload.quoteId,
+      source: payload.source,
+      createdAt: payload.quote.generatedAt,
+      updatedAt: payload.quote.generatedAt,
+      status: 'draft',
+      clientRevisionPending: false,
+      approvedAt: null,
+      completedAt: null,
+      clientRequest,
+      quote: payload.quote,
+    }),
   }
+}
+
+export async function listQuotes(idToken: string): Promise<StoredQuoteRecord[]> {
+  const payload = await requestJson<ListQuotesResponse>(apiUrl('/quotes'), {
+    method: 'GET',
+    headers: authHeaders(idToken),
+  })
+  return payload.quotes.map(mapQuoteRecordPayload)
 }

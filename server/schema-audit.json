@@ -1,0 +1,396 @@
+{
+  "checkedAt": "2026-02-19T16:05:33.422Z",
+  "sourceItemsCount": 76,
+  "schemaDynamicFieldsCount": 36,
+  "integrity": {
+    "dynamicFieldSourcesMissing": 0,
+    "invalidItemKeyRefs": 0,
+    "datasetItemKeyMismatches": 0
+  },
+  "multiUnitCanonicals": [
+    {
+      "canonicalName": "התקנת מטבח עבודה בלבד קומפלט",
+      "units": [
+        "unit",
+        "fixed"
+      ]
+    },
+    {
+      "canonicalName": "קומפלט פירוק מטבח קיים",
+      "units": [
+        "fixed",
+        "unit"
+      ]
+    },
+    {
+      "canonicalName": "פינוי מכולה פסולת",
+      "units": [
+        "unit",
+        "fixed"
+      ]
+    },
+    {
+      "canonicalName": "קומפלט",
+      "units": [
+        "fixed",
+        "unit"
+      ]
+    },
+    {
+      "canonicalName": "תכנון ניהול פרויקט 9",
+      "units": [
+        "unknown",
+        "fixed"
+      ]
+    },
+    {
+      "canonicalName": "יום עבודה - צוות 2 עובדים",
+      "units": [
+        "unit",
+        "hour",
+        "unknown"
+      ]
+    },
+    {
+      "canonicalName": "פירוק מטבח קיים",
+      "units": [
+        "unit",
+        "fixed"
+      ]
+    },
+    {
+      "canonicalName": "קומפלט התקנת מטבח עבודה בלבד",
+      "units": [
+        "unit",
+        "fixed"
+      ]
+    },
+    {
+      "canonicalName": "פירוק מטבח קיים קומפלט",
+      "units": [
+        "fixed",
+        "unit"
+      ]
+    },
+    {
+      "canonicalName": "אחוז תכנון ניהול פרויקט",
+      "units": [
+        "unit",
+        "unknown",
+        "fixed"
+      ]
+    },
+    {
+      "canonicalName": "התקנת מטבח עבודה בלבד",
+      "units": [
+        "unit",
+        "fixed"
+      ]
+    },
+    {
+      "canonicalName": "תכנון ניהול פרויקט",
+      "units": [
+        "fixed",
+        "unknown",
+        "unit"
+      ]
+    },
+    {
+      "canonicalName": "יום יום עבודה - צוות 2 עובדים",
+      "units": [
+        "hour",
+        "unknown"
+      ]
+    }
+  ],
+  "dynamicFields": [
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_bca9b2b0dc7607ae4c",
+      "label": "צביעת קירות ותקרות (מ\"ר)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_bca9b2b0dc7607ae4c",
+      "sourceExists": true,
+      "itemKey": "צביעת קירות ותקרות|sqm",
+      "unit": "sqm"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_11b5e9576d36a0e0a6",
+      "label": "חיפוי קירות אמבטיה (מ\"ר)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_11b5e9576d36a0e0a6",
+      "sourceExists": true,
+      "itemKey": "חיפוי קירות אמבטיה|sqm",
+      "unit": "sqm"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_029df010fc82d33f59",
+      "label": "שפכטל והכנת קירות (מ\"ר)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_029df010fc82d33f59",
+      "sourceExists": true,
+      "itemKey": "שפכטל והכנת קירות|sqm",
+      "unit": "sqm"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_c131740485b71ce605",
+      "label": "ריצוף גרניט פורצלן (מ\"ר)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_c131740485b71ce605",
+      "sourceExists": true,
+      "itemKey": "ריצוף גרניט פורצלן|sqm",
+      "unit": "sqm"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_dd01e426d0848f0327",
+      "label": "לוח חשמל חדש (יחידות)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_dd01e426d0848f0327",
+      "sourceExists": true,
+      "itemKey": "לוח חשמל חדש|unit",
+      "unit": "unit"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_7fe57f471ce5079bdb",
+      "label": "התקנת אסלה/כיור (יחידות)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_7fe57f471ce5079bdb",
+      "sourceExists": true,
+      "itemKey": "התקנת אסלה כיור|unit",
+      "unit": "unit"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_c0b5817d80fc7849b2",
+      "label": "איטום מרפסת (מ\"ר)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_c0b5817d80fc7849b2",
+      "sourceExists": true,
+      "itemKey": "איטום מרפסת|sqm",
+      "unit": "sqm"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_1fa62d781de2fbd0a5",
+      "label": "החלפת דלת פנים (יחידות)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_1fa62d781de2fbd0a5",
+      "sourceExists": true,
+      "itemKey": "החלפת דלת פנים|unit",
+      "unit": "unit"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_6cc4341f697077d988",
+      "label": "נקודת מים/ביוב (נקודות)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_6cc4341f697077d988",
+      "sourceExists": true,
+      "itemKey": "נקודת מים ביוב|unit",
+      "unit": "unit"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_054dcb5e63f74fe1cd",
+      "label": "פירוק ריצוף קיים ופינוי (מ\"ר)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_054dcb5e63f74fe1cd",
+      "sourceExists": true,
+      "itemKey": "פירוק ריצוף קיים ופינוי|sqm",
+      "unit": "sqm"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_95c6b27c5314bee87a",
+      "label": "עבודות גבס - קיר/נישה (מ\"ר)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_95c6b27c5314bee87a",
+      "sourceExists": true,
+      "itemKey": "עבודות גבס - קיר נישה|sqm",
+      "unit": "sqm"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_11ceb6556e50d32bdc",
+      "label": "התקנת נקודת חשמל (נקודות)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_11ceb6556e50d32bdc",
+      "sourceExists": true,
+      "itemKey": "התקנת נקודת חשמל|unit",
+      "unit": "unit"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_123e62198488d95f99",
+      "label": "פינוי מכולה פסולת (מכולות)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_123e62198488d95f99",
+      "sourceExists": true,
+      "itemKey": "פינוי מכולה פסולת|unit",
+      "unit": "unit"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_d6523c61e234feed8a",
+      "label": "עבודה - צוות 2 עובדים (ימים)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_d6523c61e234feed8a",
+      "sourceExists": true,
+      "itemKey": "יום עבודה - צוות 2 עובדים|unknown",
+      "unit": "unknown"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_658cf23793f4b54d3c",
+      "label": "התקנת מטבח (עבודה בלבד) (יחידות)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_658cf23793f4b54d3c",
+      "sourceExists": true,
+      "itemKey": "התקנת מטבח עבודה בלבד|unit",
+      "unit": "unit"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_322e3c5d6541a2611b",
+      "label": "פירוק מטבח קיים (יחידות)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_322e3c5d6541a2611b",
+      "sourceExists": true,
+      "itemKey": "פירוק מטבח קיים|unit",
+      "unit": "unit"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_50e295a06cf26fc21f",
+      "label": "פירוק מטבח קיים קומפלט (קומפלט)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_50e295a06cf26fc21f",
+      "sourceExists": true,
+      "itemKey": "פירוק מטבח קיים קומפלט|unit",
+      "unit": "unit"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_32fd0c187d8d4fc3a2",
+      "label": "התקנת פרקט למינציה (מ\"ר)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_32fd0c187d8d4fc3a2",
+      "sourceExists": true,
+      "itemKey": "התקנת פרקט למינציה|sqm",
+      "unit": "sqm"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_ec91a4fc6dbee1c2ed",
+      "label": "פירוק ריצוף קיים (מ\"ר)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_ec91a4fc6dbee1c2ed",
+      "sourceExists": true,
+      "itemKey": "פירוק ריצוף קיים|sqm",
+      "unit": "sqm"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_aca98bb3b800e98250",
+      "label": "התקנת מטבח (עבודה בלבד) קומפלט (קומפלט)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_aca98bb3b800e98250",
+      "sourceExists": true,
+      "itemKey": "התקנת מטבח עבודה בלבד קומפלט|fixed",
+      "unit": "fixed"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_6a1899a43831dc9303",
+      "label": "פינוי מכולה פסולת מכולה (מכולות)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_6a1899a43831dc9303",
+      "sourceExists": true,
+      "itemKey": "פינוי מכולה פסולת מכולה|unit",
+      "unit": "unit"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_bc36dc0ca9631fd450",
+      "label": "נקודה (נקודות)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_bc36dc0ca9631fd450",
+      "sourceExists": true,
+      "itemKey": "נקודה|unit",
+      "unit": "unit"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_cabe02ccd3adab18b4",
+      "label": "יחידה (יחידות)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_cabe02ccd3adab18b4",
+      "sourceExists": true,
+      "itemKey": "יחידה|unit",
+      "unit": "unit"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_bb47c8a4ddc09030cd",
+      "label": "עבודה - צוות 2 עובדים יום (ימים)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_bb47c8a4ddc09030cd",
+      "sourceExists": true,
+      "itemKey": "יום עבודה - צוות 2 עובדים יום|hour",
+      "unit": "hour"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_03994c8102735b61c7",
+      "label": "לוח חשמל חדש יחידה (יחידות)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_03994c8102735b61c7",
+      "sourceExists": true,
+      "itemKey": "לוח חשמל חדש יחידה|unit",
+      "unit": "unit"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_9d769d9eff7d1fc187",
+      "label": "החלפת דלת פנים יחידה (יחידות)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_9d769d9eff7d1fc187",
+      "sourceExists": true,
+      "itemKey": "החלפת דלת פנים יחידה|unit",
+      "unit": "unit"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_faba3fbbdb75523aa0",
+      "label": "ריצוף גרניט פורצלן מ\"ר (מ\"ר)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_faba3fbbdb75523aa0",
+      "sourceExists": true,
+      "itemKey": "ריצוף גרניט פורצלן מר|sqm",
+      "unit": "sqm"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_02c5d1d4dd42ef8f03",
+      "label": "מכולה (מכולות)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_02c5d1d4dd42ef8f03",
+      "sourceExists": true,
+      "itemKey": "מכולה|unit",
+      "unit": "unit"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_1880435c86defdcaf5",
+      "label": "קומפלט (קומפלט)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_1880435c86defdcaf5",
+      "sourceExists": true,
+      "itemKey": "קומפלט|fixed",
+      "unit": "fixed"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_0ceff6e6cfd1648936",
+      "label": "נקודת מים/ביוב נקודה (נקודות)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_0ceff6e6cfd1648936",
+      "sourceExists": true,
+      "itemKey": "נקודת מים ביוב נקודה|unit",
+      "unit": "unit"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_491dab0e20a663dc4b",
+      "label": "שפכטל והכנת קירות מ\"ר (מ\"ר)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_491dab0e20a663dc4b",
+      "sourceExists": true,
+      "itemKey": "שפכטל והכנת קירות מר|sqm",
+      "unit": "sqm"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_8869bf030bd613400f",
+      "label": "פירוק ריצוף קיים ופינוי מ\"ר (מ\"ר)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_8869bf030bd613400f",
+      "sourceExists": true,
+      "itemKey": "פירוק ריצוף קיים ופינוי מר|sqm",
+      "unit": "sqm"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_12ef75f8155c1be48a",
+      "label": "צביעת קירות ותקרות מ\"ר (מ\"ר)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_12ef75f8155c1be48a",
+      "sourceExists": true,
+      "itemKey": "צביעת קירות ותקרות מר|sqm",
+      "unit": "sqm"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_b36d3a9057b0d664fc",
+      "label": "איטום מרפסת מ\"ר (מ\"ר)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_b36d3a9057b0d664fc",
+      "sourceExists": true,
+      "itemKey": "איטום מרפסת מר|sqm",
+      "unit": "sqm"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_bdb5f1fa52cdc56c8e",
+      "label": "עבודות גבס - קיר/נישה מ\"ר (מ\"ר)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_bdb5f1fa52cdc56c8e",
+      "sourceExists": true,
+      "itemKey": "עבודות גבס - קיר נישה מר|sqm",
+      "unit": "sqm"
+    },
+    {
+      "fieldId": "qty_ueqG8NONmEWXTnQaV0CZI7fPJo13_c0c4a09a8e41baac8f",
+      "label": "מים/ביוב (נקודות)",
+      "sourceItemId": "ueqG8NONmEWXTnQaV0CZI7fPJo13_c0c4a09a8e41baac8f",
+      "sourceExists": true,
+      "itemKey": "נקודה מים ביוב|unit",
+      "unit": "unit"
+    }
+  ]
+}
