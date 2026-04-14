@@ -12,6 +12,11 @@ import {
   renderTrainingEvaluationMarkdown,
 } from '../src/services/model-evaluation.service.js'
 import {
+  buildModelFeatureRowFromDatasetExample,
+  getModelFeatureSchema,
+  validateModelFeatureRow,
+} from '../src/services/model-feature-schema.service.js'
+import {
   buildRandomEvaluationSplit,
   buildTimeEvaluationSplit,
 } from '../src/services/model-evaluation-split.service.js'
@@ -61,6 +66,15 @@ async function run(): Promise<void> {
   ])
   if (examples.length < 2) {
     throw new Error(`Not enough dataset examples for evaluation (found ${examples.length})`)
+  }
+  const schema = getModelFeatureSchema()
+  const invalidRows = examples
+    .map((example) => ({ id: example.id, errors: validateModelFeatureRow(buildModelFeatureRowFromDatasetExample(example)) }))
+    .filter((row) => row.errors.length > 0)
+  if (invalidRows.length > 0) {
+    throw new Error(
+      `Feature schema ${schema.version} validation failed for ${invalidRows.length} rows. Example: ${invalidRows[0].id} -> ${invalidRows[0].errors.join(',')}`,
+    )
   }
 
   const randomSplit = buildRandomEvaluationSplit(examples, testRatio)

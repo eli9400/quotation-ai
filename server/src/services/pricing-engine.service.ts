@@ -1,4 +1,5 @@
 import { estimateUnitPriceLinear, exactMatchUnitPrice } from './line-pricing-utils.service.js'
+import { createModelV1Predictor } from './model-v1-inference.service.js'
 import {
   estimateBinnedMedianPrice,
   resolveExamples,
@@ -39,6 +40,7 @@ export type GroundedPricingMethod =
   | 'median_low_coverage'
   | 'similar_item_fallback'
   | 'trend_fallback'
+  | 'model_v1_blend'
 
 export type GroundedPricingLine = {
   id: string
@@ -161,8 +163,16 @@ export async function buildGroundedPricingLines(input: {
   serviceProviderUid: string
   requestedItems: QuoteRequestedItem[]
   learnedItems: LearnedPricingItem[]
+  industry?: string | null
+  requestFeatures?: {
+    projectType?: string | null
+    scope?: string | null
+    urgency?: string | null
+    requirements?: string | null
+  }
 }): Promise<BuildGroundedPricingResult> {
   const statsLookup = await createDatasetStatsLookup(input.serviceProviderUid)
+  const modelPredictor = await createModelV1Predictor(input.serviceProviderUid)
   const learnedById = new Map(input.learnedItems.map((item) => [item.id, item]))
   const skippedSourceItemIds: string[] = []
   const lines: GroundedPricingLine[] = []
@@ -217,6 +227,29 @@ export async function buildGroundedPricingLines(input: {
     const maxUnitPrice = maxAllowedUnitPrice(item.unit)
     const safeUnitPrice = round2(Math.max(0.1, Math.min(baseUnitPrice, maxUnitPrice)))
     const wasClamped = safeUnitPrice < baseUnitPrice
+    let finalUnitPrice = safeUnitPrice
+    if (modelPredictor) {
+      const predicted = modelPredictor.predict({
+        itemKey: toItemKey(item),
+        itemName: item.canonicalName,
+        unit: item.unit,
+        quantity,
+        industry: input.industry ?? null,
+        projectType: input.requestFeatures?.projectType ?? null,
+        scope: input.requestFeatures?.scope ?? null,
+        urgency: input.requestFeatures?.urgency ?? null,
+        requirements: input.requestFeatures?.requirements ?? null,
+      })
+      if (predicted) {
+        const deltaRatio = Math.abs(predicted.unitPrice - safeUnitPrice) / Math.max(1, safeUnitPrice)
+        const maxRatio = coverage.tier === 'high' ? 0.25 : coverage.tier === 'medium' ? 0.45 : 0.8
+        if (deltaRatio <= maxRatio) {
+          const modelWeight = coverage.tier === 'high' ? 0.25 : coverage.tier === 'medium' ? 0.4 : 0.55
+          finalUnitPrice = round2(safeUnitPrice * (1 - modelWeight) + predicted.unitPrice * modelWeight)
+          method = 'model_v1_blend'
+        }
+      }
+    }
 
     lines.push({
       id: `${item.id}_${Date.now()}_${index}`,
@@ -225,8 +258,8 @@ export async function buildGroundedPricingLines(input: {
       description: resolveLabel(item, requested.label),
       unit: item.unit,
       quantity,
-      baseUnitPrice: safeUnitPrice,
-      baseLineTotal: round2(safeUnitPrice * quantity),
+      baseUnitPrice: finalUnitPrice,
+      baseLineTotal: round2(finalUnitPrice * quantity),
       priceStats: stats,
       coverage,
       pricingMethod: method,

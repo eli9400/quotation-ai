@@ -78,6 +78,13 @@ export async function generateLearnedQuote(
     serviceProviderUid: input.serviceProviderUid,
     requestedItems: groundedRequested,
     learnedItems,
+    industry: profile?.industry ?? null,
+    requestFeatures: {
+      projectType: input.request.projectType,
+      scope: input.request.scope,
+      urgency: input.request.urgency,
+      requirements: input.request.requirements,
+    },
   })
 
   const lineItems: InternalPricedLine[] = grounded.lines.map((line) => ({

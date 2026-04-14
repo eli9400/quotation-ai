@@ -113,10 +113,18 @@ Phase status: **Completed**
 ---
 
 ## Phase 4 - Model V1 in Production
-- [ ] Train regression model (CatBoost/XGBoost) for `unitPrice`.
-- [ ] Freeze stable feature schema.
-- [ ] Save artifacts + metadata + metrics.
-- [ ] Add inference service with safe fallback.
+- [x] Train regression model V1 for `unitPrice` (initial `linear_quantity_v1`).
+- [x] Freeze stable feature schema.
+- [x] Save artifacts + metadata + metrics.
+- [x] Add inference service with safe fallback.
+
+Definition of Done:
+- [x] Training script builds and persists an active model artifact per provider dataset snapshot.
+- [x] Artifact includes dataset fingerprint/version, feature schema version, and evaluation metrics.
+- [x] Inference path supports model prediction with safe fallback (no model -> existing pricing flow).
+- [x] Backend tests and build pass after model integration.
+
+Phase status: **Completed**
 
 ---
 
@@ -153,14 +161,26 @@ Phase status: **Completed**
 ---
 
 ## Next 3 (Immediate)
-- [ ] Phase 4: Implement initial regression trainer pipeline (CatBoost/XGBoost candidate with fixed feature contract).
-- [ ] Phase 4: Persist model artifact metadata/versioning and add safe loading path.
-- [ ] Phase 4: Add inference fallback policy and smoke-test on at least one provider snapshot.
+- [ ] Phase 5: Add quantile outputs (`p25/p50/p75`) and confidence-aware serving policy.
+- [ ] Phase 5: Improve cold-start handling for unseen items/units across providers.
+- [ ] Phase 5: Add uncertainty threshold that routes low-confidence lines to manual review.
 
 ---
 
 ## Session Log
 - 2026-04-14:
+  - Completed Phase 4 Model V1 production foundations:
+    - Added provider-level model artifact storage (`model_artifacts`) with active-version switching and cache.
+    - Implemented V1 regression trainer (`linear_quantity_v1`) with random/time evaluation metrics.
+    - Added training script `server/scripts/train-model-v1.ts` and npm script `train:model:v1`.
+    - Integrated model predictor with safe fallback into grounded pricing flow.
+    - Validated end-to-end by training and activating model for provider `tJUQlidFsKeOWi3w8AFMQoWPdQG3`.
+  - Started Phase 4 (Model V1 foundations):
+    - Added global stable model feature schema contract (`v1`) shared by training/evaluation/inference paths.
+    - Added feature-row mappers for dataset examples and inference inputs with strict validation.
+    - Integrated schema validation into `evaluate-training-dataset` script before metric computation.
+    - Wired inference-side schema validation into quote line autofill path (safe skip + warning on invalid rows).
+    - Added automated tests for feature schema mapping, serialization, and validation behavior.
   - Completed Phase 3 evaluation harness:
     - Added deterministic metric service (`MAE`, `MAPE`, `SMAPE`, `MedianAE`) with automated tests.
     - Added random-split and time-split evaluators for training datasets.
