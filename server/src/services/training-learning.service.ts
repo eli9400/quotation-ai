@@ -8,6 +8,7 @@ import { normalizePricingItemsForServiceProvider } from './pricing-items-normali
 import { normalizeObservationsForTraining } from './pricing-observation-normalizer.service.js'
 import { validateObservationsForTraining } from './pricing-observation-validation.service.js'
 import { extractPricingObservations } from './pricing-observation-parser.service.js'
+import { getServiceProviderByUid } from './service-providers.service.js'
 import { buildTrainingAuditReport } from './training-audit.service.js'
 import { rebuildTrainingDatasetFromObservations } from './training-dataset.service.js'
 import {
@@ -140,7 +141,10 @@ export async function runLearningTrainingJob(params: RunTrainingParams): Promise
     )
     const observationsRaw =
       aiParsed && aiParsed.length > 0 ? aiParsed : parsed.observations
-    const validation = validateObservationsForTraining(observationsRaw)
+    const serviceProvider = await getServiceProviderByUid(params.serviceProviderUid)
+    const validation = validateObservationsForTraining(observationsRaw, {
+      industry: serviceProvider?.industry ?? null,
+    })
     console.info(
       `[training] validation gate: input=${validation.stats.input}, kept=${validation.stats.kept}, dropped=${validation.stats.dropped}, genericName=${validation.stats.droppedByReason.generic_name}, invalidUnit=${validation.stats.droppedByReason.invalid_unit}, invalidQuantity=${validation.stats.droppedByReason.invalid_quantity}, invalidPrice=${validation.stats.droppedByReason.invalid_price}, invalidLineTotal=${validation.stats.droppedByReason.invalid_line_total}, extremeHigh=${validation.stats.droppedByReason.extreme_price_high}, extremeLow=${validation.stats.droppedByReason.extreme_price_low}`,
     )

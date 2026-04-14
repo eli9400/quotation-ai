@@ -2,6 +2,7 @@ import { categorizeProviderLineItem, resolveDynamicCategoryForLineItem } from '.
 import { listExcludedProviderLineItemIds } from './provider-line-item-exclusions.service.js'
 import { getCatalogLineItemsForIndustry } from './provider-line-items.catalog.js'
 import { isSoftNearDuplicateName } from './provider-line-items-duplicates.service.js'
+import { isNearDuplicateProviderLineItemName, normalizeProviderLineItemNameKey, suppressIndustryAndCatalogWhenProviderExists } from './provider-line-items-preference.service.js'
 import { listProviderLineItemDisplayOverridesMap } from './provider-line-item-overrides.service.js'
 import { listProviderPricingItemsWithIndustryBaseline, type ProviderPricingItem } from './pricing-items-source.service.js'
 import { getServiceProviderIndustryMeta } from './service-provider-industries.service.js'
@@ -41,23 +42,6 @@ const GENERAL_LABEL = 'שירותים כלליים'
 
 function normalizeLabel(label: string): string {
   return label.replace(/\s+/g, ' ').trim()
-}
-
-function normalizeForKey(value: string): string {
-  return value.toLowerCase().replace(/[+/_-]+/g, ' ').replace(/[^a-z0-9\u0590-\u05ff\s]/g, ' ').replace(/\s+/g, ' ').trim()
-}
-
-function isNearDuplicateName(left: string, right: string): boolean {
-  if (!left || !right || left === right) return false
-  const leftWords = left.split(' ').filter(Boolean)
-  const rightWords = right.split(' ').filter(Boolean)
-  if (leftWords.length < 2 || rightWords.length < 2) return false
-  const shorter = left.length <= right.length ? left : right
-  const longer = left.length <= right.length ? right : left
-  if (shorter.length >= 8 && longer.includes(shorter)) return true
-  const rightSet = new Set(rightWords)
-  const intersection = leftWords.filter((word) => rightSet.has(word)).length
-  return intersection >= Math.min(leftWords.length, rightWords.length) && Math.abs(leftWords.length - rightWords.length) <= 1
 }
 
 function isProviderOnly(unit: PricingUnit, label: string): boolean {
@@ -138,7 +122,7 @@ function pickPreferredOption(current: ProviderLineItemOption, next: ProviderLine
 }
 
 function findGroupedKey(grouped: Map<string, ProviderLineItemOption>, option: ProviderLineItemOption): string {
-  const normalizedName = normalizeForKey(option.canonicalName)
+  const normalizedName = normalizeProviderLineItemNameKey(option.canonicalName)
   const exactKey = `${normalizedName}|${option.unit}`
   if (grouped.has(exactKey)) return exactKey
   for (const [key, groupedOption] of grouped.entries()) {
@@ -146,7 +130,7 @@ function findGroupedKey(grouped: Map<string, ProviderLineItemOption>, option: Pr
     if (separatorIndex <= 0) continue
     if (key.slice(separatorIndex + 1) !== option.unit) continue
     const groupedName = key.slice(0, separatorIndex)
-    if (isNearDuplicateName(groupedName, normalizedName)) return key
+    if (isNearDuplicateProviderLineItemName(groupedName, normalizedName)) return key
     if (isSoftNearDuplicateName(option.canonicalName, groupedOption.canonicalName, option.sourceType, groupedOption.sourceType)) return key
   }
   return exactKey
@@ -188,7 +172,7 @@ function applyDisplayOverrides(options: ProviderLineItemOption[], overrides: Map
       ...option,
       clientLabel: customLabel || option.canonicalName,
       visibleToClient: !option.isProviderOnly && !(override?.hiddenFromClient ?? false),
-      categoryId: customCategoryLabel ? customCategoryId || `manual_${normalizeForKey(customCategoryLabel).replace(/\s+/g, '_')}` : option.categoryId,
+      categoryId: customCategoryLabel ? customCategoryId || `manual_${normalizeProviderLineItemNameKey(customCategoryLabel).replace(/\s+/g, '_')}` : option.categoryId,
       categoryLabel: customCategoryLabel || option.categoryLabel,
       isCategoryOverridden: Boolean(customCategoryLabel),
     }
@@ -204,7 +188,8 @@ export async function listProviderLineItemOptions(serviceProviderUid: string): P
     listExcludedProviderLineItemIds(serviceProviderUid),
   ])
   const merged = dedupeOptions([...pricingItems.map(toPricingOption), ...toCatalogOptions(industryMeta.value, industryMeta.label, industryMeta.categoryId)])
-  return applyDisplayOverrides(assignCategories(merged, industryMeta.value, industryMeta.categoryId), overrides)
+  const providerPreferred = suppressIndustryAndCatalogWhenProviderExists(merged)
+  return applyDisplayOverrides(assignCategories(providerPreferred, industryMeta.value, industryMeta.categoryId), overrides)
     .filter((item) => !excludedItemIds.has(item.id))
     .filter((item) => item.canonicalName.length > 0)
     .sort((left, right) => {

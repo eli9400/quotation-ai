@@ -12,7 +12,20 @@ import {
 const BATCH_LIMIT = 400
 const MAX_ALIAS_COUNT = 40
 const MAX_SAMPLE_COUNT = 160
-
+const WEAK_SIGNATURE_TOKENS = new Set([
+  'service',
+  'work',
+  'item',
+  'transport',
+  'callout',
+  '\u05DB\u05D5\u05DC\u05DC',
+  '\u05E9\u05D9\u05E8\u05D5\u05EA',
+  '\u05E2\u05D1\u05D5\u05D3\u05D4',
+  '\u05E4\u05E8\u05D9\u05D8',
+  'retem',
+  '\u05E2\u05D5\u05D3\u05D9',
+  '\u05D0\u05DC',
+])
 type PricingItemDoc = LearnedPricingItem & { id: string }
 type NormalizeResult = {
   before: number
@@ -23,13 +36,20 @@ type NormalizeResult = {
 }
 
 function resolveUnit(item: PricingItemDoc): PricingUnit {
+  if (item.unit !== 'unknown') return item.unit
   const hint = detectPricingUnitHint(`${item.canonicalName} ${(item.aliases ?? []).join(' ')}`)
-  if (hint) return hint
-  return item.unit
+  return hint ?? item.unit
 }
 
 function isNoiseName(name: string): boolean {
   return isNoisePricingItemName(name)
+}
+
+function nameSignature(value: string): string {
+  const tokens = pricingCanonicalKey(value).split(' ').filter((token) => token.length > 0)
+  const reduced = tokens.filter((token) => !WEAK_SIGNATURE_TOKENS.has(token))
+  const source = reduced.length >= 2 ? reduced : tokens
+  return Array.from(new Set(source)).sort((left, right) => left.localeCompare(right)).join(' ')
 }
 
 function toRange(value: NumericRange): NumericRange {
@@ -96,20 +116,23 @@ function pickPrimary(items: PricingItemDoc[]): PricingItemDoc {
 }
 
 function chooseGroupUnit(items: PricingItemDoc[]): PricingUnit {
-  const fullText = items.map((item) => `${item.canonicalName} ${(item.aliases ?? []).join(' ')}`).join(' ')
-  const hinted = detectPricingUnitHint(fullText)
-  if (hinted) return hinted
-
   const counters = new Map<PricingUnit, number>()
   items.forEach((item) => {
     const current = counters.get(item.unit) ?? 0
     counters.set(item.unit, current + Math.max(1, item.sampleLines ?? 0))
   })
 
-  return Array.from(counters.entries()).sort((left, right) => {
+  const preferredUnit =
+    Array.from(counters.entries()).sort((left, right) => {
     if (right[1] !== left[1]) return right[1] - left[1]
     return UNIT_PRIORITY[left[0]] - UNIT_PRIORITY[right[0]]
   })[0]?.[0] ?? 'unit'
+
+  if (preferredUnit !== 'unknown') return preferredUnit
+
+  const fullText = items.map((item) => `${item.canonicalName} ${(item.aliases ?? []).join(' ')}`).join(' ')
+  const hinted = detectPricingUnitHint(fullText)
+  return hinted ?? preferredUnit
 }
 
 function mergeGroup(items: PricingItemDoc[]): PricingItemDoc {
@@ -164,7 +187,7 @@ export async function normalizePricingItemsForServiceProvider(
       noiseIds.add(item.id)
       return
     }
-    const key = pricingCanonicalKey(cleanedName)
+    const key = nameSignature(cleanedName)
     const current = byName.get(key) ?? []
     current.push({ ...item, canonicalName: cleanedName, unit })
     byName.set(key, current)
@@ -173,7 +196,7 @@ export async function normalizePricingItemsForServiceProvider(
   const mergedByItem = new Map<string, PricingItemDoc[]>()
   byName.forEach((group) => {
     const unit = chooseGroupUnit(group)
-    const key = `${pricingCanonicalKey(group[0].canonicalName)}|${unit}`
+    const key = `${nameSignature(group[0].canonicalName)}|${unit}`
     const current = mergedByItem.get(key) ?? []
     group.forEach((item) => current.push({ ...item, unit }))
     mergedByItem.set(key, current)
@@ -207,3 +230,4 @@ export async function normalizePricingItemsForServiceProvider(
     removedNoise: noiseIds.size,
   }
 }
+

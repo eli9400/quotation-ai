@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.json",
     "test": "tsx --test src/**/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "audit:training": "tsx scripts/post-training-quality-check.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",
