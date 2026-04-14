@@ -11,6 +11,10 @@ import {
   assignDatasetSplitsByItemDocument,
   resolveObservationSplit,
 } from './training-dataset-split.service.js'
+import {
+  buildDatasetFingerprint,
+  buildDatasetVersionId,
+} from './training-dataset-governance.service.js'
 import { buildTrainingDatasetStats } from './training-dataset-stats.service.js'
 import type { PricingObservation } from '../types/pricing-observation.js'
 import type {
@@ -180,13 +184,25 @@ export async function rebuildTrainingDatasetFromObservations(
   input: RebuildInput,
 ): Promise<RebuildTrainingDatasetResult> {
   const filtered = sanitizeObservations(input.observations)
+  const generatedAt = nowIso()
   if (filtered.length === 0) {
     const existing = await listExamplesByServiceProvider(input.serviceProviderUid)
-    const stats = buildTrainingDatasetStats(input.serviceProviderUid, existing)
+    const datasetFingerprint = buildDatasetFingerprint(existing)
+    const datasetVersionId = buildDatasetVersionId(datasetFingerprint)
+    const stats = buildTrainingDatasetStats(input.serviceProviderUid, existing, {
+      datasetFingerprint,
+      datasetVersionId,
+      generatedAt,
+    })
     return {
       totalExamples: stats.totalExamples,
       splitCounts: stats.splitCounts,
       uniqueItems: stats.uniqueItems,
+      sourceCounts: stats.sourceCounts,
+      unitDistribution: stats.unitDistribution,
+      datasetFingerprint: stats.datasetFingerprint,
+      datasetVersionId: stats.datasetVersionId,
+      generatedAt: stats.generatedAt,
     }
   }
 
@@ -212,13 +228,24 @@ export async function rebuildTrainingDatasetFromObservations(
   await commitInBatches(writes)
 
   const allExamples = await listExamplesByServiceProvider(input.serviceProviderUid)
-  const stats = buildTrainingDatasetStats(input.serviceProviderUid, allExamples)
+  const datasetFingerprint = buildDatasetFingerprint(allExamples)
+  const datasetVersionId = buildDatasetVersionId(datasetFingerprint)
+  const stats = buildTrainingDatasetStats(input.serviceProviderUid, allExamples, {
+    datasetFingerprint,
+    datasetVersionId,
+    generatedAt,
+  })
   await db.collection(TRAINING_DATASET_STATS_COLLECTION).doc(input.serviceProviderUid).set(stats)
 
   return {
     totalExamples: stats.totalExamples,
     splitCounts: stats.splitCounts,
     uniqueItems: stats.uniqueItems,
+    sourceCounts: stats.sourceCounts,
+    unitDistribution: stats.unitDistribution,
+    datasetFingerprint: stats.datasetFingerprint,
+    datasetVersionId: stats.datasetVersionId,
+    generatedAt: stats.generatedAt,
   }
 }
 

@@ -1,4 +1,5 @@
 import { getFirestoreDb } from '../config/firebase.js'
+import { buildDatasetFingerprint, buildDatasetVersionId } from './training-dataset-governance.service.js'
 import { buildTrainingDatasetStats } from './training-dataset-stats.service.js'
 import {
   TRAINING_DATASET_COLLECTION,
@@ -15,7 +16,14 @@ export async function refreshTrainingDatasetStatsForServiceProvider(
     .where('serviceProviderUid', '==', serviceProviderUid)
     .get()
   const examples = snapshot.docs.map((doc) => doc.data() as TrainingDatasetExample)
-  const stats = buildTrainingDatasetStats(serviceProviderUid, examples)
+  const generatedAt = new Date().toISOString()
+  const datasetFingerprint = buildDatasetFingerprint(examples)
+  const datasetVersionId = buildDatasetVersionId(datasetFingerprint)
+  const stats = buildTrainingDatasetStats(serviceProviderUid, examples, {
+    datasetFingerprint,
+    datasetVersionId,
+    generatedAt,
+  })
   await db.collection(TRAINING_DATASET_STATS_COLLECTION).doc(serviceProviderUid).set(stats)
   return stats
 }

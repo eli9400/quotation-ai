@@ -23,12 +23,14 @@ function addSplit(splitCounts: DatasetSplitCounts, split: DatasetSplit): void {
 export function buildTrainingDatasetStats(
   serviceProviderUid: string,
   examples: TrainingDatasetExample[],
+  options: { datasetFingerprint?: string; datasetVersionId?: string; generatedAt?: string } = {},
 ): TrainingDatasetStats {
   const splitCounts = createSplitCounts()
   const sourceCounts: Record<DatasetExampleSource, number> = {
     uploaded_document: 0,
     approved_quote: 0,
   }
+  const unitDistribution: Record<string, number> = {}
   const itemAggregation = new Map<
     string,
     { itemName: string; unit: TrainingDatasetExample['unit']; exampleCount: number; documents: Set<string> }
@@ -37,6 +39,7 @@ export function buildTrainingDatasetStats(
   examples.forEach((example) => {
     addSplit(splitCounts, example.split)
     sourceCounts[example.source] += 1
+    unitDistribution[example.unit] = (unitDistribution[example.unit] ?? 0) + 1
 
     const current = itemAggregation.get(example.itemKey) ?? {
       itemName: example.itemName,
@@ -69,7 +72,10 @@ export function buildTrainingDatasetStats(
     splitCounts,
     uniqueItems: itemAggregation.size,
     sourceCounts,
+    unitDistribution,
+    datasetFingerprint: options.datasetFingerprint ?? '',
+    datasetVersionId: options.datasetVersionId ?? '',
     itemStats,
-    generatedAt: nowIso(),
+    generatedAt: options.generatedAt ?? nowIso(),
   }
 }
