@@ -102,8 +102,11 @@ function fromEnvironmentVariables(): FirebaseCredentialSource | null {
   const values = [projectId, clientEmail, privateKey]
   const hasAny = values.some((value) => value.length > 0)
   const hasAll = values.every((value) => value.length > 0)
+  const isCloudRunRuntime = typeof process.env.K_SERVICE === 'string' && process.env.K_SERVICE.length > 0
+  const canFallbackToAdc = env.firebaseUseAdc || isCloudRunRuntime
   if (!hasAny) return null
   if (!hasAll) {
+    if (canFallbackToAdc) return null
     const missingKeys = [
       ...(projectId ? [] : ['FIREBASE_PROJECT_ID']),
       ...(clientEmail ? [] : ['FIREBASE_CLIENT_EMAIL']),
