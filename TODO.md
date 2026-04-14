@@ -81,10 +81,18 @@ Phase status: **Completed**
 ---
 
 ## Phase 2 - Dataset Governance
-- [ ] Add dataset version id per training job.
-- [ ] Persist fixed snapshot metrics per run.
-- [ ] Add dataset fingerprint/hash for deterministic run comparison.
-- [ ] Add drift check vs previous run.
+- [x] Add dataset version id per training job.
+- [x] Persist fixed snapshot metrics per run.
+- [x] Add dataset fingerprint/hash for deterministic run comparison.
+- [x] Add drift check vs previous run.
+
+Definition of Done:
+- [x] Every completed training job stores dataset snapshot metadata.
+- [x] Snapshot includes deterministic fingerprint + version id.
+- [x] Drift summary is computed against previous completed run when baseline exists.
+- [x] Governance metadata is generated for both uploaded-document and approved-quote dataset paths.
+
+Phase status: **Completed**
 
 ---
 
@@ -137,14 +145,19 @@ Phase status: **Completed**
 ---
 
 ## Next 3 (Immediate)
-- [x] Phase 1: Validate new normalization pipeline on a fresh 50-file run (new logs + Firestore quality checks).
-- [x] Phase 1: Add Firestore quality checklist automation script for post-training verification.
-- [x] Phase 1: Run a second 50-file validation on another provider domain (cross-domain guard).
+- [ ] Phase 3: Define model evaluation baseline and metric contracts (`MAE`, `MAPE`, `SMAPE`, `MedianAE`).
+- [ ] Phase 3: Implement evaluation script (time split + random split + baseline model comparison).
+- [ ] Phase 3: Publish first evaluation report from current production-like dataset snapshot.
 
 ---
 
 ## Session Log
 - 2026-04-14:
+  - Completed Phase 2 dataset governance foundations:
+    - Added deterministic dataset fingerprint and dataset version id.
+    - Persisted fixed dataset snapshot metrics on completed training jobs.
+    - Added automatic drift summary versus previous completed run.
+    - Added governance tests and integrated metadata into dataset stats refresh flows.
   - Completed Phase 1 DoD on production-like runs (50-file and large ~300-file validation path).
   - Cleaned duplicate/noisy provider pricing items and verified `unit=unknown` is zero.
   - Added global provider-vs-industry preference: when provider has equivalent item, hide industry/catalog duplicate in line-items API.

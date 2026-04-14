@@ -10,10 +10,12 @@ import { validateObservationsForTraining } from './pricing-observation-validatio
 import { extractPricingObservations } from './pricing-observation-parser.service.js'
 import { getServiceProviderByUid } from './service-providers.service.js'
 import { buildTrainingAuditReport } from './training-audit.service.js'
+import { createTrainingDatasetSnapshot } from './training-dataset-governance.service.js'
 import { rebuildTrainingDatasetFromObservations } from './training-dataset.service.js'
 import {
   completeTrainingJob,
   failTrainingJob,
+  getLatestCompletedTrainingJobByServiceProvider,
   updateTrainingJobProgress,
 } from './training-jobs.service.js'
 import type { TrainingStage } from '../types/training.js'
@@ -167,13 +169,16 @@ export async function runLearningTrainingJob(params: RunTrainingParams): Promise
     }
     await reportProgress(76, 'parse_pricing_lines', 100)
 
+    const previousCompletedJob = await getLatestCompletedTrainingJobByServiceProvider(
+      params.serviceProviderUid,
+    )
     const datasetResult = await rebuildTrainingDatasetFromObservations({
       serviceProviderUid: params.serviceProviderUid,
       trainingJobId: params.jobId,
       observations,
     })
     console.info(
-      `[dataset] rebuilt for ${params.serviceProviderUid}: examples=${datasetResult.totalExamples}, train=${datasetResult.splitCounts.train}, validation=${datasetResult.splitCounts.validation}, test=${datasetResult.splitCounts.test}, items=${datasetResult.uniqueItems}`,
+      `[dataset] rebuilt for ${params.serviceProviderUid}: version=${datasetResult.datasetVersionId}, fingerprint=${datasetResult.datasetFingerprint.slice(0, 12)}, examples=${datasetResult.totalExamples}, train=${datasetResult.splitCounts.train}, validation=${datasetResult.splitCounts.validation}, test=${datasetResult.splitCounts.test}, items=${datasetResult.uniqueItems}`,
     )
     await reportProgress(86, 'build_dataset', 100)
 
@@ -188,7 +193,15 @@ export async function runLearningTrainingJob(params: RunTrainingParams): Promise
     await reportProgress(98, 'normalize_schema', 100)
     await reportProgress(99, 'finalize', 100)
 
-    await completeTrainingJob(params.jobId)
+    const datasetSnapshot = createTrainingDatasetSnapshot({
+      result: datasetResult,
+      previousSnapshot: previousCompletedJob?.datasetSnapshot ?? null,
+      previousJobId: previousCompletedJob?.id ?? null,
+    })
+    console.info(
+      `[training] dataset drift: baseline=${datasetSnapshot.driftFromPreviousRun.baselineAvailable}, severity=${datasetSnapshot.driftFromPreviousRun.severity}, totalDelta=${datasetSnapshot.driftFromPreviousRun.totalExamplesDelta}, uniqueDelta=${datasetSnapshot.driftFromPreviousRun.uniqueItemsDelta}`,
+    )
+    await completeTrainingJob(params.jobId, { datasetSnapshot })
   } catch (error) {
     await failTrainingJob(params.jobId, asErrorMessage(error))
   }
