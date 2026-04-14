@@ -1,221 +1,162 @@
-# 🧠 Quotation AI
-
-An AI-powered full-stack platform for analyzing contractor quotations, learning pricing patterns, and generating intelligent quote estimates from real-world data.
-
----
-
-## 🎯 Overview
-
-Quotation AI is a system designed for service providers who need to manage, analyze, and generate quotations efficiently.
-
-The platform ingests unstructured documents (PDF, Word, Excel), extracts pricing data, learns from historical quotes, and uses AI to improve pricing accuracy and consistency.
-
-Unlike simple document parsers, Quotation AI combines:
-
-* File parsing
-* Data normalization
-* Historical learning
-* AI-based interpretation and pricing calibration
-
----
-
-## 🚀 Key Features
-
-### 📄 Document Processing
-
-* Upload PDF, DOCX, XLS/XLSX, CSV files
-* Extract raw text using parsing libraries
-* Support for messy, real-world contractor documents
-
-### 🧩 Data Extraction
-
-* Heuristic-based extraction of pricing lines
-* AI-powered extraction using OpenAI
-* Conversion of unstructured text into structured pricing items
-
-### 📊 Pricing Intelligence
-
-* Learn from historical quotations
-* Build structured datasets from uploaded files
-* Normalize item names and units across different formats
-
-### 🤖 AI-Powered Pricing
-
-* Use OpenAI models to:
-
-  * Interpret unstructured pricing data
-  * Extract relevant pricing lines
-  * Calibrate and refine unit prices
-* Improve accuracy beyond rule-based systems
-
-### 🧾 Quote Generation
-
-* Generate quotation estimates based on:
-
-  * Historical data
-  * Normalized items
-  * Client requirements
-* Output structured JSON for further processing
-
-### 👥 Multi-Side System
-
-* **Service Provider Portal**
-
-  * Upload documents
-  * Train system on past quotes
-  * Manage pricing data
-
-* **Client Interface**
-
-  * Dynamic form generation
-  * Submit quote requests
-  * Receive structured estimates
-
----
-
-## 🛠️ Tech Stack
-
-### Frontend
-
-* React
-* TypeScript
-* Vite
-
-### Backend
-
-* Node.js
-* Express
-* TypeScript
-
-### AI & Processing
-
-* OpenAI API (chat completions)
-* pdf-parse (PDF parsing)
-* mammoth (DOCX parsing)
-* xlsx (Excel parsing)
-
-### Infrastructure
-
-* Firebase Authentication
-* Firestore Database
-* Firebase Admin SDK
-* Multer (file uploads)
-* dotenv / CORS
-
----
-
-## ⚙️ System Flow
-
-1. **Service Provider uploads quotation files**
-2. Backend extracts raw text from documents
-3. System attempts to extract pricing lines:
-
-   * Heuristic extraction
-   * AI-assisted extraction (OpenAI)
-4. Data is normalized and stored
-5. Historical pricing dataset is built
-6. Client submits a request via dynamic form
-7. System generates initial quote estimate
-8. OpenAI refines/calibrates pricing based on context
-9. Final structured quote is returned
-
----
-
-## 🤖 AI Integration
-
-Quotation AI uses the OpenAI API as a core component of the system.
-
-AI is used to:
-
-* Extract structured pricing data from unstructured text
-* Understand context and relationships between items
-* Normalize inconsistent quotation formats
-* Refine and calibrate pricing suggestions
-
-This allows the system to handle real-world data that is too inconsistent for traditional rule-based parsing alone.
-
----
-
-## 📁 Project Structure
-
+# Quotation AI
+Quotation AI is a full-stack system for service providers:
+- Upload historical quote files (PDF/DOCX/XLSX/CSV)
+- Train pricing intelligence from real line-items
+- Manage model line-items and client form fields
+- Handle incoming quote requests
+## 1) What This Project Does
+- Authenticates service providers (Firebase Auth)
+- Stores model/training/docs data (Firestore)
+- Stores uploaded files (Firebase Storage)
+- Extracts pricing text and runs training
+- Serves provider line-items to a client-facing quote flow
+Main flow:
+1. Provider signs in.
+2. Provider uploads quote documents.
+3. System validates and extracts pricing lines.
+4. Provider starts training.
+5. Learned items become available in model/editor/form preview.
+## 2) Tech Stack
+- Frontend: React 19, TypeScript, Vite
+- Backend: Node.js, Express 5, TypeScript
+- Firebase: Auth, Firestore, Storage
+- AI and parsing:
+  - OpenAI API (optional but recommended)
+  - `pdf-parse`, `mammoth`, `xlsx`
+## 3) Project Structure
+```text
 quotation-ai/
-├── src/                     # React frontend
-├── server/
-│   ├── src/
-│   │   ├── routes/          # API endpoints
-│   │   ├── services/        # AI + parsing services
-│   │   ├── controllers/     # Request handlers
-│   │   └── models/          # Data models
-│   └── config/              # Environment configuration
-
----
-
-## 🚀 Getting Started
-
-### 1. Clone the repository
-
-git clone https://github.com/eli9400/quotation-ai.git
-cd quotation-ai
-
----
-
-### 2. Install dependencies
-
-#### Frontend
-
+  src/                                # Frontend (Vite)
+  server/
+    src/                              # Backend (Express)
+    scripts/                          # Retrain / rollback / normalization scripts
+    .env.example                      # Backend env template
+  .env.example                        # Frontend env template
+  firebase-service-account.example.json
+```
+## 4) Prerequisites
+- Node.js 20+, npm 10+
+- Firebase project with:
+  - Email/Password Auth
+  - Firestore
+  - Storage bucket
+- Access to that Firebase project
+- Optional OpenAI API key for AI features
+## 5) Installation
+```bash
 npm install
-
-#### Backend
-
-cd server
-npm install
-
----
-
-### 3. Environment Variables
-
-Create a `.env` file in the server directory:
-
-OPENAI_API_KEY=your_api_key
+npm --prefix server install
+```
+## 6) Environment Setup
+### Frontend (`.env.local`)
+Create from template:
+```bash
+cp .env.example .env.local
+```
+Fill:
+```env
+VITE_API_BASE_URL=http://localhost:4000/api
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
+```
+### Backend (`server/.env`)
+Create from template:
+```bash
+cp server/.env.example server/.env
+```
+Minimum runtime values:
+```env
+PORT=4000
+WEB_ORIGIN=http://localhost:5173
+UPLOADS_DIR=./uploads
+UPLOADS_MAX_MB=10
+CLIENT_FORM_MAX_ITEMS=40
+FIREBASE_STORAGE_BUCKET=
+OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
 OPENAI_BASE_URL=https://api.openai.com/v1
-
----
-
-### 4. Run the project
-
-#### Start backend
-
+```
+## 7) Firebase Admin Setup Options
+### Option A: Local service account JSON (recommended)
+1. Copy `firebase-service-account.example.json` to `server/firebase-service-account.json`
+2. Put real credentials in that file
+3. In `server/.env`:
+```env
+FIREBASE_SERVICE_ACCOUNT_PATH=./firebase-service-account.json
+```
+### Option B: Direct env values
+In `server/.env`:
+```env
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your-project-id.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+```
+`FIREBASE_PRIVATE_KEY` supports escaped newlines (`\n`).
+### Cloud Run compatibility
+Still supported:
+```env
+FIREBASE_USE_ADC=true
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_STORAGE_BUCKET=your-bucket
+```
+## 8) Files Missing From Git (Must Come From Project Owner)
+- `.env.local` values
+- `server/.env` values
+- Real Firebase Admin credentials:
+  - `server/firebase-service-account.json`, or
+  - direct Firebase Admin env vars
+- Firebase project access permissions
+- OpenAI API key (if AI features are required)
+## 9) Run Locally
+Terminal 1 (backend):
+```bash
+npm --prefix server run dev
+```
+Terminal 2 (frontend):
+```bash
 npm run dev
-
-#### Start frontend
-
-npm run dev
-
----
-
-## 💡 Highlights
-
-* Full-stack system (React + Node.js + Firebase)
-* AI-powered document understanding using OpenAI
-* Handles messy, real-world contractor data
-* Learns pricing patterns from historical data
-* Combines heuristics + AI for better accuracy
-* Real business use case (quotation analysis & generation)
-
----
-
-## 📌 Future Improvements
-
-* Advanced ML-based pricing models
-* Better UI for comparing multiple quotations
-* Analytics dashboard for pricing trends
-* Improved prompt engineering and model tuning
-* Support for additional industries
-
----
-
-## 👤 Author
-
-**Eli Blechman**
-GitHub: https://github.com/eli9400
+```
+## 10) Expected Local Result
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:4000`
+- Health endpoint: `GET http://localhost:4000/api/health`
+  - Expected response contains:
+    - `"ok": true`
+    - `"service": "quotation-ai-server"`
+UI expectations:
+- First screen: hero + provider login/signup
+- After login:
+  - Documents panel (upload/remove/clear)
+  - Training panel with stages/progress
+  - Client form preview and items editor
+  - Quotes history section
+## 11) Helpful Scripts
+- Frontend:
+  - `npm run lint`
+  - `npm run build`
+- Backend:
+  - `npm --prefix server run typecheck`
+  - `npm --prefix server run test`
+  - `npm --prefix server run build`
+  - `npm --prefix server run audit:training -- --uid=<SERVICE_PROVIDER_UID>`
+- Utilities:
+  - `npx --prefix server tsx server/scripts/full-retrain.ts --uid=<SERVICE_PROVIDER_UID>`
+  - `npx --prefix server tsx server/scripts/normalize-pricing-items.ts --uid=<SERVICE_PROVIDER_UID>`
+  - `npx --prefix server tsx server/scripts/rollback-training-job.ts --jobId=<JOB_ID>`
+## 12) Troubleshooting
+- `Firebase Admin is not configured`:
+  - Configure Option A or Option B (or ADC on Cloud Run)
+  - Ensure `FIREBASE_STORAGE_BUCKET` is set
+- Service account path not found:
+  - Verify `FIREBASE_SERVICE_ACCOUNT_PATH`
+  - Recommended local file: `server/firebase-service-account.json`
+- Invalid private key:
+  - Keep full key with BEGIN/END markers
+  - For env mode, use `\n` escaped newlines
+## 13) Security Note
+- Never commit `.env`, `.env.local`, service account JSON, or API keys.
+- Use local env files, secret manager, or CI/CD secrets.
