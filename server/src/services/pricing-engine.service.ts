@@ -73,6 +73,7 @@ const HIGH_COVERAGE_THRESHOLD = 20
 const MEDIUM_COVERAGE_THRESHOLD = 5
 const SIMILARITY_THRESHOLD = 0.34
 const EXAMPLES_LIMIT = 8
+const VISIT_HINT = /(\u05D1\u05D9\u05E7\u05D5\u05E8|visit|service[_\s-]*call|callout|\u05E7\u05E8\u05D9\u05D0\u05EA\s*\u05E9\u05D9\u05E8\u05D5\u05EA)/i
 
 function maxAllowedUnitPrice(unit: PricingUnit): number {
   switch (unit) {
@@ -107,6 +108,10 @@ function resolveCoverageTier(exampleCount: number): PricingCoverageTier {
   return 'low'
 }
 
+function clamp(value: number, low: number, high: number): number {
+  return Math.max(low, Math.min(high, value))
+}
+
 function resolveCoverage(
   item: LearnedPricingItem,
   statsLookup: Map<string, DatasetItemStatsLookup>,
@@ -126,6 +131,14 @@ function resolveCoverage(
 function resolveLabel(item: LearnedPricingItem, fallback: string): string {
   const preferredAlias = item.aliases?.find((alias) => alias.trim().length > 0)
   return (preferredAlias ?? fallback).trim() || item.canonicalName
+}
+
+function resolveQuoteUnit(item: LearnedPricingItem): PricingUnit {
+  if (item.unit === 'point') {
+    const source = `${item.canonicalName} ${(item.aliases ?? []).join(' ')}`
+    if (VISIT_HINT.test(source)) return 'unit'
+  }
+  return item.unit
 }
 
 function findSimilarItem(
@@ -209,7 +222,7 @@ export async function buildGroundedPricingLines(input: {
             ? 'median_low_coverage'
             : 'trend_fallback'
     let referenceItemKey: string | null = null
-    const needsManualReview = coverage.tier === 'low'
+    let needsManualReview = coverage.tier === 'low'
 
     if (coverage.tier === 'low') {
       const similarItem = findSimilarItem(item, input.learnedItems, statsLookup)
@@ -230,7 +243,7 @@ export async function buildGroundedPricingLines(input: {
     let finalUnitPrice = safeUnitPrice
     if (modelPredictor) {
       const predicted = modelPredictor.predict({
-        itemKey: toItemKey(item),
+        itemKey: null,
         itemName: item.canonicalName,
         unit: item.unit,
         quantity,
@@ -241,12 +254,44 @@ export async function buildGroundedPricingLines(input: {
         requirements: input.requestFeatures?.requirements ?? null,
       })
       if (predicted) {
-        const deltaRatio = Math.abs(predicted.unitPrice - safeUnitPrice) / Math.max(1, safeUnitPrice)
-        const maxRatio = coverage.tier === 'high' ? 0.25 : coverage.tier === 'medium' ? 0.45 : 0.8
+        const deltaRatio = Math.abs(predicted.p50 - safeUnitPrice) / Math.max(1, safeUnitPrice)
+        const maxRatioBase = coverage.tier === 'high' ? 0.25 : coverage.tier === 'medium' ? 0.45 : 0.8
+        const sourceFactor =
+          predicted.source === 'direct_item_unit'
+            ? 1
+            : predicted.source === 'unit_fallback'
+              ? 0.85
+              : 0.7
+        const uncertaintyFactor = Math.max(0.4, 1 - predicted.uncertaintyScore * 0.6)
+        const maxRatio = maxRatioBase * sourceFactor * uncertaintyFactor
         if (deltaRatio <= maxRatio) {
-          const modelWeight = coverage.tier === 'high' ? 0.25 : coverage.tier === 'medium' ? 0.4 : 0.55
-          finalUnitPrice = round2(safeUnitPrice * (1 - modelWeight) + predicted.unitPrice * modelWeight)
+          const baseModelWeight = coverage.tier === 'high' ? 0.25 : coverage.tier === 'medium' ? 0.4 : 0.55
+          const sourceWeight =
+            predicted.source === 'direct_item_unit'
+              ? 1
+              : predicted.source === 'unit_fallback'
+                ? 0.75
+                : 0.55
+          const uncertaintyWeight = Math.max(0.35, 1 - predicted.uncertaintyScore * 0.7)
+          const modelWeight = clamp(baseModelWeight * sourceWeight * uncertaintyWeight, 0.1, 0.7)
+          const blended = safeUnitPrice * (1 - modelWeight) + predicted.p50 * modelWeight
+          const lowBound = Math.min(safeUnitPrice, predicted.p25)
+          const highBound = Math.max(safeUnitPrice, predicted.p75)
+          finalUnitPrice = round2(clamp(blended, lowBound, highBound))
           method = 'model_v1_blend'
+        }
+        const uncertaintyThreshold =
+          predicted.source === 'direct_item_unit'
+            ? 0.55
+            : predicted.source === 'unit_fallback'
+              ? 0.4
+              : 0.3
+        if (
+          predicted.uncertaintyScore >= uncertaintyThreshold ||
+          predicted.source === 'global_fallback' ||
+          (predicted.source !== 'direct_item_unit' && coverage.tier === 'low')
+        ) {
+          needsManualReview = true
         }
       }
     }
@@ -256,7 +301,7 @@ export async function buildGroundedPricingLines(input: {
       sourceItemId: item.id,
       itemKey: toItemKey(item),
       description: resolveLabel(item, requested.label),
-      unit: item.unit,
+      unit: resolveQuoteUnit(item),
       quantity,
       baseUnitPrice: finalUnitPrice,
       baseLineTotal: round2(finalUnitPrice * quantity),

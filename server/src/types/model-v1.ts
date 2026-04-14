@@ -13,7 +13,9 @@ export type ModelV1Regressor = {
   samples: number
   intercept: number
   slope: number
-  median: number
+  p25: number
+  p50: number
+  p75: number
   minPrediction: number
   maxPrediction: number
 }

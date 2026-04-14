@@ -21,6 +21,10 @@ type PredictorInput = {
 
 export type ModelV1Prediction = {
   unitPrice: number
+  p25: number
+  p50: number
+  p75: number
+  uncertaintyScore: number
   source: 'direct_item_unit' | 'unit_fallback' | 'global_fallback'
   modelArtifactId: string
 }
@@ -46,6 +50,10 @@ export async function createModelV1Predictor(serviceProviderUid: string): Promis
       if (!Number.isFinite(predicted.unitPrice) || predicted.unitPrice <= 0) return null
       return {
         unitPrice: predicted.unitPrice,
+        p25: predicted.p25,
+        p50: predicted.p50,
+        p75: predicted.p75,
+        uncertaintyScore: predicted.uncertaintyScore,
         source: predicted.source,
         modelArtifactId: artifact.id,
       }

@@ -11,6 +11,7 @@ import { calibrateUnitPricesWithOpenAi } from './openai-line-pricing.service.js'
 import { listProviderPricingItemsWithIndustryBaseline } from './pricing-items-source.service.js'
 import { buildGroundedPricingLines } from './pricing-engine.service.js'
 import { applyCpiFactorToUnitPrice } from './quote-pricing-adjustments.service.js'
+import { resolveRequestedSourceItemId } from './requested-item-grounding.service.js'
 import { getServiceProviderByUid } from './service-providers.service.js'
 import type {
   GeneratedQuote,
@@ -69,6 +70,11 @@ export async function generateLearnedQuote(
         : null
     if (sourceItemId && learnedById.has(sourceItemId)) {
       groundedRequested.push({ ...item, sourceItemId })
+      return
+    }
+    const resolvedSourceItemId = resolveRequestedSourceItemId(item, learnedItems)
+    if (resolvedSourceItemId && learnedById.has(resolvedSourceItemId)) {
+      groundedRequested.push({ ...item, sourceItemId: resolvedSourceItemId })
       return
     }
     marketRequested.push(item)

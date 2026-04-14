@@ -1,7 +1,7 @@
 const UNIT_LABELS: Record<string, string> = {
   sqm: 'מ"ר',
   unit: 'יחידה',
-  point: 'נקודה',
+  point: 'יחידה (ביקור)',
   day: 'יום',
   hour: 'שעה',
   meter: 'מטר',
@@ -16,4 +16,3 @@ export function toUnitLabel(unit: string): string {
   const key = unit.trim().toLowerCase()
   return UNIT_LABELS[key] ?? unit
 }
-

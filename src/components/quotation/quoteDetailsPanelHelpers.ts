@@ -12,7 +12,7 @@ export const QUOTE_UNIT_OPTIONS = [
   { value: 'custom', label: 'מותאם אישית' },
   { value: 'sqm', label: 'מ"ר' },
   { value: 'unit', label: 'יחידה' },
-  { value: 'point', label: 'נקודה' },
+  { value: 'point', label: 'יחידה (ביקור)' },
   { value: 'day', label: 'יום' },
   { value: 'hour', label: 'שעה' },
   { value: 'meter', label: 'מטר' },

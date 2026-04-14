@@ -129,10 +129,12 @@ Phase status: **Completed**
 ---
 
 ## Phase 5 - Advanced Model V2
-- [ ] Add quantile modeling (`p25/p50/p75`).
-- [ ] Add robust cold-start strategy for new items.
-- [ ] Add uncertainty score and manual-review threshold.
-- [ ] Improve controlled fuzzy merge for item variants.
+- [x] Add quantile modeling (`p25/p50/p75`).
+- [x] Add robust cold-start strategy for new items.
+- [x] Add uncertainty score and manual-review threshold.
+- [x] Improve controlled fuzzy merge for item variants.
+
+Phase status: **Completed**
 
 ---
 
@@ -161,14 +163,25 @@ Phase status: **Completed**
 ---
 
 ## Next 3 (Immediate)
-- [ ] Phase 5: Add quantile outputs (`p25/p50/p75`) and confidence-aware serving policy.
-- [ ] Phase 5: Improve cold-start handling for unseen items/units across providers.
-- [ ] Phase 5: Add uncertainty threshold that routes low-confidence lines to manual review.
+- [ ] Phase 6: Implement hybrid decision engine order (`Rules -> ML -> LLM explanation`) end-to-end.
+- [ ] Phase 6: Add explainability payload per line-item (source, confidence, fallback path).
+- [ ] Phase 6: Verify manual category overrides affect inference outputs.
 
 ---
 
 ## Session Log
 - 2026-04-14:
+  - Completed Phase 5 (Advanced Model V2):
+    - Implemented controlled fuzzy merge with strict guards to avoid over-merge of distinct variants.
+    - Added regression tests for merge/split behavior across plumbing and window-installation style variants.
+    - Added visit-unit compatibility in source grounding (`unit` and legacy `point` for visit-like requests).
+    - Updated provider line-item display mapping: visit-like `point` items are exposed as `unit` in UI options.
+  - Started Phase 5 (Advanced Model V2):
+    - Added quantile-aware model outputs (`p25/p50/p75`) and uncertainty score in Model V1 predictor.
+    - Added cold-start-safe serving logic (direct/unit/global fallback aware blending).
+    - Added uncertainty/manual-review routing in pricing flow (fallback + high uncertainty => review).
+    - Added backward-compatible artifact normalization for pre-quantile model artifacts.
+    - Re-trained and activated provider model artifact after quantile update (`tJUQlidFsKeOWi3w8AFMQoWPdQG3`).
   - Completed Phase 4 Model V1 production foundations:
     - Added provider-level model artifact storage (`model_artifacts`) with active-version switching and cache.
     - Implemented V1 regression trainer (`linear_quantity_v1`) with random/time evaluation metrics.
