@@ -23,6 +23,36 @@ export const TRAINING_STAGES: TrainingStage[] = [
 
 export type TrainingStageProgress = Record<TrainingStage, number>
 
+export type TrainingDatasetSnapshotMetrics = {
+  totalExamples: number
+  splitCounts: { train: number; validation: number; test: number }
+  uniqueItems: number
+  sourceCounts: { uploaded_document: number; approved_quote: number }
+  unitDistribution: Record<string, number>
+  generatedAt: string
+}
+
+export type TrainingDatasetDrift = {
+  baselineAvailable: boolean
+  comparedToJobId: string | null
+  comparedToDatasetVersionId: string | null
+  changed: boolean
+  severity: 'none' | 'low' | 'medium' | 'high'
+  totalExamplesDelta: number
+  totalExamplesDeltaPct: number | null
+  uniqueItemsDelta: number
+  uniqueItemsDeltaPct: number | null
+  maxUnitShareDeltaPctPoints: number
+  unitShareDeltaPctPoints: Record<string, number>
+}
+
+export type TrainingDatasetSnapshot = {
+  datasetVersionId: string
+  datasetFingerprint: string
+  metrics: TrainingDatasetSnapshotMetrics
+  driftFromPreviousRun: TrainingDatasetDrift
+}
+
 export type TrainingJob = {
   id: string
   serviceProviderUid: string
@@ -35,4 +65,5 @@ export type TrainingJob = {
   updatedAt: string
   completedAt: string | null
   errorMessage: string | null
+  datasetSnapshot: TrainingDatasetSnapshot | null
 }

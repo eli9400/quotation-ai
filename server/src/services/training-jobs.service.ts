@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { getFirestoreDb } from '../config/firebase.js'
 import type { TrainingJob, TrainingStage, TrainingStageProgress } from '../types/training.js'
 import { createCompletedStageProgress, createEmptyStageProgress, isEmptyStageProgress, mergeTrainingStageProgress, normalizeTrainingStage, normalizeTrainingStageProgress } from './training-stage-progress.service.js'
+import { normalizeTrainingDatasetSnapshot } from './training-dataset-snapshot-normalization.service.js'
 
 const TRAINING_JOBS_COLLECTION = 'training_jobs'
 
@@ -11,12 +12,17 @@ type UpdateTrainingProgressOptions = {
   stageProgress?: Partial<TrainingStageProgress>
 }
 
+type CompleteTrainingJobOptions = {
+  datasetSnapshot?: TrainingJob['datasetSnapshot']
+}
+
 type RawTrainingJob = Partial<TrainingJob> & {
   id?: string
   serviceProviderUid?: string
   contractorUid?: string
   currentStage?: TrainingStage
   stageProgress?: Partial<TrainingStageProgress>
+  datasetSnapshot?: unknown
 }
 
 function nowIso(): string {
@@ -70,6 +76,7 @@ function normalizeTrainingJob(raw: RawTrainingJob, fallbackUid: string): Trainin
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : nowIso(),
     completedAt: typeof raw.completedAt === 'string' ? raw.completedAt : null,
     errorMessage: typeof raw.errorMessage === 'string' ? raw.errorMessage : null,
+    datasetSnapshot: normalizeTrainingDatasetSnapshot(raw.datasetSnapshot),
   }
 }
 
@@ -136,6 +143,7 @@ export async function createTrainingJob(
     updatedAt: timestamp,
     completedAt: null,
     errorMessage: null,
+    datasetSnapshot: null,
   }
   await persistTrainingJob(job)
   return job
@@ -222,7 +230,10 @@ export async function setTrainingJobProgress(jobId: string, progress: number): P
   return updateTrainingJobProgress(jobId, { progress })
 }
 
-export async function completeTrainingJob(jobId: string): Promise<TrainingJob | null> {
+export async function completeTrainingJob(
+  jobId: string,
+  options: CompleteTrainingJobOptions = {},
+): Promise<TrainingJob | null> {
   const job = await getTrainingJob(jobId)
   if (!job) {
     return null
@@ -238,6 +249,7 @@ export async function completeTrainingJob(jobId: string): Promise<TrainingJob | 
     updatedAt: completedAt,
     completedAt,
     errorMessage: null,
+    datasetSnapshot: options.datasetSnapshot ?? job.datasetSnapshot ?? null,
   }
   await persistTrainingJob(completed)
   return completed

@@ -53,6 +53,9 @@ export type TrainingDatasetStats = {
   splitCounts: DatasetSplitCounts
   uniqueItems: number
   sourceCounts: Record<DatasetExampleSource, number>
+  unitDistribution: Record<string, number>
+  datasetFingerprint: string
+  datasetVersionId: string
   itemStats: TrainingDatasetItemStats[]
   generatedAt: string
 }
@@ -61,4 +64,9 @@ export type RebuildTrainingDatasetResult = {
   totalExamples: number
   splitCounts: DatasetSplitCounts
   uniqueItems: number
+  sourceCounts: Record<DatasetExampleSource, number>
+  unitDistribution: Record<string, number>
+  datasetFingerprint: string
+  datasetVersionId: string
+  generatedAt: string
 }

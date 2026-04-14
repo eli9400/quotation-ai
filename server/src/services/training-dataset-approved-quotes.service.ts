@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { getFirestoreDb } from '../config/firebase.js'
 import { getServiceProviderByUid } from './service-providers.service.js'
+import { buildDatasetFingerprint, buildDatasetVersionId } from './training-dataset-governance.service.js'
 import { buildTrainingDatasetStats } from './training-dataset-stats.service.js'
 import { canonicalizeTrainingItemForIndustry } from './training-item-canonicalization.service.js'
 import {
@@ -93,7 +94,14 @@ async function commitInBatches(
 async function refreshStats(serviceProviderUid: string): Promise<void> {
   const db = getFirestoreDb()
   const examples = await listProviderExamples(serviceProviderUid)
-  const stats = buildTrainingDatasetStats(serviceProviderUid, examples)
+  const generatedAt = nowIso()
+  const datasetFingerprint = buildDatasetFingerprint(examples)
+  const datasetVersionId = buildDatasetVersionId(datasetFingerprint)
+  const stats = buildTrainingDatasetStats(serviceProviderUid, examples, {
+    datasetFingerprint,
+    datasetVersionId,
+    generatedAt,
+  })
   await db.collection(TRAINING_DATASET_STATS_COLLECTION).doc(serviceProviderUid).set(stats)
 }
 

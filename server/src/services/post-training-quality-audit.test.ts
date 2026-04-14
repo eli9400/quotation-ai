@@ -72,6 +72,7 @@ function buildJob(input: Partial<TrainingJob> = {}): TrainingJob {
     updatedAt: input.updatedAt ?? '2026-04-14T00:00:00.000Z',
     completedAt: input.completedAt ?? '2026-04-14T00:10:00.000Z',
     errorMessage: input.errorMessage ?? null,
+    datasetSnapshot: input.datasetSnapshot ?? null,
   }
 }
 

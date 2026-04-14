@@ -59,6 +59,8 @@ export type TrainingQualityAuditReport = {
     uniqueItemKeys: number
     jobDocuments: number
     coveredJobDocuments: number
+    datasetVersionId: string | null
+    datasetFingerprint: string | null
   }
   samples: {
     suspiciousPricingItems: string[]
@@ -143,6 +145,8 @@ export function buildPostTrainingQualityAudit(input: AuditInput): TrainingQualit
     .filter((value, index, array) => array.indexOf(value) === index)
     .slice(0, SAMPLE_LIMIT)
   const nearDuplicatePairs = buildNearDuplicatePairs(input.pricingItems)
+  const datasetVersionId = input.job?.datasetSnapshot?.datasetVersionId ?? null
+  const datasetFingerprint = input.job?.datasetSnapshot?.datasetFingerprint ?? null
   const checks: TrainingQualityCheck[] = [
     { id: 'job-status', status: !input.job || input.job.status === 'completed' ? 'pass' : 'fail', message: input.job ? `Training job status: ${input.job.status}` : 'No training job provided; provider-level audit only.' },
     { id: 'pricing-unknown-unit', status: input.pricingItems.some((item) => item.unit === 'unknown') ? 'fail' : 'pass', message: `Pricing items with unknown unit: ${input.pricingItems.filter((item) => item.unit === 'unknown').length}` },
@@ -152,6 +156,7 @@ export function buildPostTrainingQualityAudit(input: AuditInput): TrainingQualit
     { id: 'dataset-suspicious-names', status: suspiciousDatasetItems.length > 0 ? 'fail' : 'pass', message: `Suspicious dataset item names: ${suspiciousDatasetItems.length}` },
     { id: 'pricing-near-duplicates', status: nearDuplicatePairs.length > 0 ? 'warn' : 'pass', message: `Possible near-duplicate pricing items: ${nearDuplicatePairs.length}` },
     { id: 'job-document-coverage', status: input.job && coveredJobDocuments.size === 0 ? 'fail' : missingJobDocumentIds.length > 0 ? 'warn' : 'pass', message: `Covered job documents: ${coveredJobDocuments.size}/${input.job?.documentIds.length ?? 0}` },
+    { id: 'job-dataset-snapshot', status: input.job ? (datasetVersionId && datasetFingerprint ? 'pass' : 'warn') : 'pass', message: input.job ? `Dataset snapshot attached: ${Boolean(datasetVersionId && datasetFingerprint)}` : 'No training job provided; dataset snapshot check skipped.' },
   ]
 
   addRangeCheck(checks, 'range-pricing-items', 'Pricing items', input.pricingItems.length, input.expectations?.pricingItems)
@@ -172,6 +177,8 @@ export function buildPostTrainingQualityAudit(input: AuditInput): TrainingQualit
       uniqueItemKeys: new Set(input.datasetExamples.map((example) => example.itemKey)).size,
       jobDocuments: input.job?.documentIds.length ?? 0,
       coveredJobDocuments: coveredJobDocuments.size,
+      datasetVersionId,
+      datasetFingerprint,
     },
     samples: {
       suspiciousPricingItems,
