@@ -1,0 +1,46 @@
+{
+  "ok": true,
+  "report": {
+    "serviceProviderUid": "tJUQlidFsKeOWi3w8AFMQoWPdQG3",
+    "generatedAt": "2026-04-14T13:54:01.417Z",
+    "totalExamples": 112,
+    "datasetVersionId": "ds_4b9ae1bd78161093",
+    "datasetFingerprint": "4b9ae1bd78161093a73561d2e6ab2432c5bfabb4",
+    "summaries": [
+      {
+        "strategy": "random",
+        "trainCount": 91,
+        "testCount": 21,
+        "metrics": {
+          "samples": 21,
+          "mae": 276.5,
+          "mape": 25.3984,
+          "smape": 22.3146,
+          "medianAe": 120.5
+        },
+        "coverage": {
+          "directItemUnit": 21,
+          "unitFallback": 0,
+          "globalFallback": 0
+        }
+      },
+      {
+        "strategy": "time",
+        "trainCount": 90,
+        "testCount": 22,
+        "metrics": {
+          "samples": 22,
+          "mae": 222.9773,
+          "mape": 22.607,
+          "smape": 19.0101,
+          "medianAe": 79
+        },
+        "coverage": {
+          "directItemUnit": 22,
+          "unitFallback": 0,
+          "globalFallback": 0
+        }
+      }
+    ]
+  }
+}

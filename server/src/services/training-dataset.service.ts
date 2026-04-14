@@ -271,7 +271,13 @@ export async function listUploadedDocumentIdsInDataset(
     new Set(
       examples
         .filter((example) => example.source === 'uploaded_document' && example.sourceDocumentId)
-        .map((example) => example.sourceDocumentId as string),
+      .map((example) => example.sourceDocumentId as string),
     ),
   )
+}
+
+export async function listTrainingDatasetExamples(
+  serviceProviderUid: string,
+): Promise<TrainingDatasetExample[]> {
+  return listExamplesByServiceProvider(serviceProviderUid)
 }
