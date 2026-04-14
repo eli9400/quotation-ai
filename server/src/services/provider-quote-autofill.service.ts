@@ -1,11 +1,12 @@
 import { buildQuoteFromLineItems } from './quote-breakdown.service.js'
 import { exactMatchUnitPrice, estimateUnitPriceLinear } from './line-pricing-utils.service.js'
 import { buildModelFeatureRowFromInferenceInput, validateModelFeatureRow } from './model-feature-schema.service.js'
-import { listProviderPricingItemsWithIndustryBaseline } from './pricing-items-source.service.js'
+import { listProviderPricingItemsWithIndustryBaseline, type ProviderPricingItem } from './pricing-items-source.service.js'
 import { estimateBinnedMedianPrice } from './pricing-engine-utils.service.js'
+import { resolveRequestedSourceItemId } from './requested-item-grounding.service.js'
 import { getServiceProviderByUid } from './service-providers.service.js'
 import type { LearnedPricingItem } from '../types/model-profile.js'
-import type { GeneratedQuote, QuoteLineItem } from '../types/quote.js'
+import type { GeneratedQuote, QuoteLineItem, QuoteRequestedItem } from '../types/quote.js'
 const SIMILARITY_THRESHOLD = 0.34
 
 function round2(value: number): number {
@@ -86,6 +87,34 @@ function needsAutofill(line: QuoteLineItem): boolean {
   return line.unitPrice <= 0
 }
 
+function needsSourceBinding(line: QuoteLineItem): boolean {
+  if (isPercentUnit(line.unit)) return false
+  if (line.quantity <= 0) return false
+  if (line.sourceItemId) return false
+  return line.description.trim().length > 0
+}
+
+function toRequestedItem(line: QuoteLineItem): QuoteRequestedItem {
+  return {
+    sourceItemId: null,
+    label: line.description,
+    quantity: line.quantity,
+    unit: line.unit,
+  }
+}
+
+function resolveBindingItem(
+  line: QuoteLineItem,
+  items: ProviderPricingItem[],
+): ProviderPricingItem | null {
+  if (line.sourceItemId) {
+    return items.find((item) => item.id === line.sourceItemId) ?? null
+  }
+  const resolvedSourceItemId = resolveRequestedSourceItemId(toRequestedItem(line), items)
+  if (!resolvedSourceItemId) return null
+  return items.find((item) => item.id === resolvedSourceItemId) ?? null
+}
+
 function findBestItem(line: QuoteLineItem, items: LearnedPricingItem[]): LearnedPricingItem | null {
   const lineUnit = normalizeUnit(line.unit)
   const candidates = items.filter((item) => normalizeUnit(item.unit) === lineUnit)
@@ -123,8 +152,10 @@ export async function autofillQuoteLinePricesFromTraining(
   serviceProviderUid: string,
   quote: GeneratedQuote,
 ): Promise<GeneratedQuote> {
-  const linesToAutofill = quote.lineItems.filter(needsAutofill)
-  if (linesToAutofill.length === 0) {
+  const linesToEnrich = quote.lineItems.filter(
+    (line) => needsAutofill(line) || needsSourceBinding(line),
+  )
+  if (linesToEnrich.length === 0) {
     return quote
   }
 
@@ -139,18 +170,29 @@ export async function autofillQuoteLinePricesFromTraining(
 
   let changed = false
   const updatedLineItems = quote.lineItems.map((line) => {
-    if (!needsAutofill(line)) {
+    const shouldAutofillPrice = needsAutofill(line)
+    const shouldBindSource = needsSourceBinding(line)
+    if (!shouldAutofillPrice && !shouldBindSource) {
       return line
     }
-    const item = findBestItem(line, learnedItems)
+    const bindingItem = resolveBindingItem(line, learnedItems)
+    const item = bindingItem ?? (shouldAutofillPrice ? findBestItem(line, learnedItems) : null)
     if (!item) {
       return line
+    }
+    let nextLine = line
+    if (!nextLine.sourceItemId) {
+      nextLine = { ...nextLine, sourceItemId: item.id }
+      changed = true
+    }
+    if (!shouldAutofillPrice) {
+      return nextLine
     }
     const featureRow = buildModelFeatureRowFromInferenceInput({
       itemKey: null,
       itemName: item.canonicalName,
       unit: item.unit,
-      quantity: line.quantity,
+      quantity: nextLine.quantity,
       industry: profile?.industry ?? null,
     })
     const featureErrors = validateModelFeatureRow(featureRow)
@@ -160,14 +202,13 @@ export async function autofillQuoteLinePricesFromTraining(
       )
       return line
     }
-    const unitPrice = estimateUnitPrice(item, line.quantity)
+    const unitPrice = estimateUnitPrice(item, nextLine.quantity)
     if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
-      return line
+      return nextLine
     }
     changed = true
     return {
-      ...line,
-      sourceItemId: line.sourceItemId ?? item.id,
+      ...nextLine,
       unitPrice,
     }
   })

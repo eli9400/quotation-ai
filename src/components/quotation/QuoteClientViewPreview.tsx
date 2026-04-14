@@ -2,6 +2,7 @@ import type { Quote } from '../../types/quotation'
 import { formatCurrencyIls } from '../../utils/formatters'
 import { toClientProjectedQuote } from './quoteClientProjection'
 import { isPercentLikeCustomField } from './quoteCustomFieldMath'
+import { toUnitLabel } from './unitLabels'
 
 type QuoteClientViewPreviewProps = {
   quote: Quote
@@ -52,7 +53,7 @@ export function QuoteClientViewPreview({ quote }: QuoteClientViewPreviewProps) {
           {projected.lineItems.map((line) => (
             <tr key={line.id}>
               <td>{line.description}</td>
-              <td>{line.unit}</td>
+              <td>{toUnitLabel(line.unit)}</td>
               <td>{line.quantity}</td>
               <td>{formatCurrencyIls(line.unitPrice)}</td>
               <td>{formatCurrencyIls(line.lineTotal)}</td>

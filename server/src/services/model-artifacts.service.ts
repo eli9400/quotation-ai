@@ -36,6 +36,43 @@ function setCached(serviceProviderUid: string, artifact: ModelV1Artifact | null)
   })
 }
 
+function asNumber(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback
+}
+
+function normalizeRegressor(raw: unknown): ModelV1Artifact['payload']['globalFallback'] {
+  const row = (raw ?? {}) as Record<string, unknown>
+  const minPrediction = Math.max(0.1, asNumber(row.minPrediction, 0.1))
+  const maxPrediction = Math.max(minPrediction, asNumber(row.maxPrediction, minPrediction))
+  const p50 = asNumber(row.p50, asNumber(row.median, minPrediction))
+  const p25 = asNumber(row.p25, Math.min(p50, minPrediction))
+  const p75 = asNumber(row.p75, Math.max(p50, maxPrediction))
+  return {
+    key: String(row.key ?? '*'),
+    unit: String(row.unit ?? 'unknown'),
+    samples: Math.max(1, Math.round(asNumber(row.samples, 1))),
+    intercept: asNumber(row.intercept, p50),
+    slope: asNumber(row.slope, 0),
+    p25: Math.max(minPrediction, Math.min(maxPrediction, p25)),
+    p50: Math.max(minPrediction, Math.min(maxPrediction, p50)),
+    p75: Math.max(minPrediction, Math.min(maxPrediction, p75)),
+    minPrediction,
+    maxPrediction,
+  }
+}
+
+function normalizeArtifact(raw: ModelV1Artifact): ModelV1Artifact {
+  return {
+    ...raw,
+    payload: {
+      ...raw.payload,
+      directByItemUnit: (raw.payload?.directByItemUnit ?? []).map(normalizeRegressor),
+      fallbackByUnit: (raw.payload?.fallbackByUnit ?? []).map(normalizeRegressor),
+      globalFallback: normalizeRegressor(raw.payload?.globalFallback),
+    },
+  }
+}
+
 async function listProviderArtifacts(serviceProviderUid: string): Promise<ModelV1Artifact[]> {
   const db = getFirestoreDb()
   const snapshot = await db
@@ -43,7 +80,7 @@ async function listProviderArtifacts(serviceProviderUid: string): Promise<ModelV
     .where('serviceProviderUid', '==', serviceProviderUid)
     .where('modelVersion', '==', 'v1')
     .get()
-  return snapshot.docs.map((doc) => doc.data() as ModelV1Artifact)
+  return snapshot.docs.map((doc) => normalizeArtifact(doc.data() as ModelV1Artifact))
 }
 
 export async function getLatestActiveModelV1Artifact(

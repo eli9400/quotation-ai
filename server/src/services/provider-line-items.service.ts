@@ -37,6 +37,8 @@ type LineItemOverride = {
 
 const SOURCE_PRIORITY: Record<ProviderLineItemSourceType, number> = { provider: 3, industry: 2, catalog: 1 }
 const PROVIDER_ONLY_PATTERNS = [/vat/i, /total/i, /subtotal/i, /payment/i, /advance/i, /discount/i, /management/i, /percent/i]
+const VISIT_DISPLAY_HINT =
+  /(\u05D1\u05D9\u05E7\u05D5\u05E8|visit|service[_\s-]*call|callout|\u05E7\u05E8\u05D9\u05D0\u05EA\s*\u05E9\u05D9\u05E8\u05D5\u05EA)/i
 const CLIENT_UNITS = new Set<PricingUnit>(['sqm', 'unit', 'point', 'container', 'package', 'meter'])
 const GENERAL_LABEL = 'שירותים כלליים'
 
@@ -49,6 +51,7 @@ function isProviderOnly(unit: PricingUnit, label: string): boolean {
 }
 
 function resolveDisplayUnit(unit: PricingUnit, label: string): PricingUnit {
+  if (unit === 'point' && VISIT_DISPLAY_HINT.test(label)) return 'unit'
   return unit === 'unknown' && !PROVIDER_ONLY_PATTERNS.some((pattern) => pattern.test(label)) ? 'unit' : unit
 }
 
@@ -198,3 +201,4 @@ export async function listProviderLineItemOptions(serviceProviderUid: string): P
       return priorityDelta !== 0 ? priorityDelta : left.label.localeCompare(right.label, 'he')
     })
 }
+
