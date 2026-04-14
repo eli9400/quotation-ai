@@ -35,7 +35,7 @@ type QuoteDetailsPanelProps = {
   isDeleting: boolean
   onClose: () => void
   onSave: (quoteId: string, quote: Quote) => Promise<void>
-  onApprove: (quoteId: string) => Promise<void>
+  onApprove: (quoteId: string, quote?: Quote) => Promise<void>
   onComplete: (quoteId: string) => Promise<void>
   onDelete: (quoteId: string) => Promise<void>
 }
@@ -178,6 +178,21 @@ export function QuoteDetailsPanel(props: QuoteDetailsPanelProps) {
     if (window.confirm('למחוק את ההצעה?')) await onDelete(record.id)
   }
 
+  const handleApprove = async () => {
+    if (record.status !== 'draft') return
+    if (hasChanges) {
+      if (!parsedQuote) {
+        setErrorMessage('יש לשמור שינויים תקינים לפני אישור ההצעה.')
+        return
+      }
+      setErrorMessage(null)
+      await onApprove(record.id, parsedQuote)
+      return
+    }
+    setErrorMessage(null)
+    await onApprove(record.id)
+  }
+
   const handleComplete = async () => {
     setErrorMessage(null)
     setIsCompleting(true)
@@ -234,7 +249,7 @@ export function QuoteDetailsPanel(props: QuoteDetailsPanelProps) {
           onAddEmptyCustomField={() => setState((current) => ({ ...current, customFields: [...current.customFields, emptyCustomField()] }))}
           onRemoveCustomField={(index) => setState((current) => ({ ...current, customFields: current.customFields.filter((_, i) => i !== index) }))}
           onOpenPreview={() => setIsPreviewOpen(true)}
-          onApprove={() => onApprove(record.id)}
+          onApprove={handleApprove}
           onDelete={handleDelete}
           onComplete={handleComplete}
         />

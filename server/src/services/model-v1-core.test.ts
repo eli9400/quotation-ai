@@ -37,6 +37,9 @@ test('trainAndEvaluateModelV1 returns payload and metrics', () => {
   assert.ok(trained.payload.directByItemUnit.length >= 2)
   const prediction = predictModelV1(trained.payload, { itemKey: 'a|unit', unit: 'unit', quantity: 2 })
   assert.ok(prediction.unitPrice > 0)
+  assert.ok(prediction.p25 <= prediction.p50)
+  assert.ok(prediction.p50 <= prediction.p75)
+  assert.ok(prediction.uncertaintyScore >= 0 && prediction.uncertaintyScore <= 1)
 })
 
 test('predictModelV1 falls back to unit then global', () => {

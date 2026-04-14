@@ -48,7 +48,9 @@ function fitRegressor(key: string, unit: string, points: FitPoint[]): ModelV1Reg
     samples: points.length,
     intercept: round(intercept),
     slope: round(slope),
-    median: round(quantile(ys, 0.5)),
+    p25: round(quantile(ys, 0.25)),
+    p50: round(quantile(ys, 0.5)),
+    p75: round(quantile(ys, 0.75)),
     minPrediction: round(Math.max(0.1, quantile(ys, 0.05))),
     maxPrediction: round(Math.max(0.1, quantile(ys, 0.95))),
   }
@@ -112,15 +114,34 @@ function splitTime(points: FitPoint[], testRatio = 0.2): { train: FitPoint[]; te
 export function predictModelV1(
   payload: ModelV1Payload,
   input: { itemKey: string; unit: string; quantity: number },
-): { unitPrice: number; source: PredictionSource } {
-  const direct = payload.directByItemUnit.find((row) => row.key === input.itemKey)
-  if (direct) return { unitPrice: predictWithRegressor(direct, input.quantity), source: 'direct_item_unit' }
-  const byUnit = payload.fallbackByUnit.find((row) => row.key === input.unit)
-  if (byUnit) return { unitPrice: predictWithRegressor(byUnit, input.quantity), source: 'unit_fallback' }
-  return {
-    unitPrice: predictWithRegressor(payload.globalFallback, input.quantity),
-    source: 'global_fallback',
+): {
+  unitPrice: number
+  p25: number
+  p50: number
+  p75: number
+  uncertaintyScore: number
+  source: PredictionSource
+} {
+  const toOutput = (regressor: ModelV1Regressor, source: PredictionSource) => {
+    const p50Prediction = predictWithRegressor(regressor, input.quantity)
+    const p25 = Math.max(regressor.minPrediction, Math.min(regressor.maxPrediction, regressor.p25))
+    const p75 = Math.max(regressor.minPrediction, Math.min(regressor.maxPrediction, regressor.p75))
+    const span = Math.max(0, p75 - p25)
+    const uncertaintyScore = round(Math.min(1, span / Math.max(1, p50Prediction)))
+    return {
+      unitPrice: p50Prediction,
+      p25: round(p25),
+      p50: p50Prediction,
+      p75: round(Math.max(p25, p75)),
+      uncertaintyScore,
+      source,
+    }
   }
+  const direct = payload.directByItemUnit.find((row) => row.key === input.itemKey)
+  if (direct) return toOutput(direct, 'direct_item_unit')
+  const byUnit = payload.fallbackByUnit.find((row) => row.key === input.unit)
+  if (byUnit) return toOutput(byUnit, 'unit_fallback')
+  return toOutput(payload.globalFallback, 'global_fallback')
 }
 
 function evaluate(payload: ModelV1Payload, points: FitPoint[], strategy: 'random' | 'time'): ModelV1MetricSummary {

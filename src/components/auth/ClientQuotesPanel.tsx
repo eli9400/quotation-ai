@@ -5,6 +5,7 @@ import { PrimaryButton } from '../ui/PrimaryButton'
 import { QuotePreviewModal } from '../quotation/QuotePreviewModal'
 import { computeCustomFieldsAdjustment } from '../quotation/quoteCustomFieldMath'
 import { computeLineTotals } from '../quotation/quoteLineMath'
+import { toUnitLabel } from '../quotation/unitLabels'
 
 type ClientQuotesPanelProps = {
   records: StoredQuoteRecord[]
@@ -17,7 +18,7 @@ const CLIENT_EDITABLE_UNITS: Array<{ value: string; label: string }> = [
   { value: 'custom', label: 'מותאם' },
   { value: 'sqm', label: 'מ"ר' },
   { value: 'unit', label: 'יחידה' },
-  { value: 'point', label: 'נקודה' },
+  { value: 'point', label: '����� (�����)' },
   { value: 'day', label: 'יום' },
   { value: 'hour', label: 'שעה' },
   { value: 'meter', label: 'מטר' },
@@ -189,7 +190,7 @@ export function ClientQuotesPanel({
                             onChange={(event) => updateLine(line.id, { unit: event.target.value })}
                           >
                             {!CLIENT_EDITABLE_UNITS.some((option) => option.value === line.unit) ? (
-                              <option value={line.unit}>{line.unit}</option>
+                              <option value={line.unit}>{toUnitLabel(line.unit)}</option>
                             ) : null}
                             {CLIENT_EDITABLE_UNITS.map((option) => (
                               <option key={option.value} value={option.value}>
@@ -247,3 +248,4 @@ export function ClientQuotesPanel({
     </section>
   )
 }
+

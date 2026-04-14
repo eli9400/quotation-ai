@@ -133,13 +133,17 @@ export function QuotesHistoryPanel({ authToken, records, isLoading }: QuotesHist
     }
   }
 
-  const handleApprove = async (quoteId: string) => {
+  const handleApprove = async (quoteId: string, pendingQuote?: Quote) => {
     const noAuthMessage = withAuth('נדרש להתחבר מחדש כדי לאשר הצעה.')
     if (noAuthMessage) return setErrorMessage(noAuthMessage)
     setErrorMessage(null)
     setIsApproving(true)
     try {
-      updateLocalRecord(await approveQuoteRecord(authToken as string, quoteId))
+      const token = authToken as string
+      if (pendingQuote) {
+        updateLocalRecord(await updateQuoteRecord(token, quoteId, pendingQuote))
+      }
+      updateLocalRecord(await approveQuoteRecord(token, quoteId))
     } catch (error) {
       setErrorMessage(getErrorMessage(error))
     } finally {
