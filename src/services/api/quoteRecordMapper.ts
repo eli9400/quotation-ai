@@ -28,6 +28,10 @@ function normalizeLineItems(quote: Quote) {
       quantity: Number(item.quantity) || 0,
       unitPrice: Number(item.unitPrice) || 0,
       lineTotal: Number(item.lineTotal) || 0,
+      explainability:
+        item.explainability && typeof item.explainability === 'object'
+          ? item.explainability
+          : null,
     }))
 }
 

@@ -62,11 +62,12 @@ function parseLineItems(value: unknown, fallbackEstimatedPrice: number): QuoteLi
     return [{
       id: 'legacy_total',
       sourceItemId: null,
-      description: 'סכום כללי',
+      description: '\u05E1\u05DB\u05D5\u05DD \u05DB\u05DC\u05DC\u05D9',
       unit: 'custom',
       quantity: 1,
       unitPrice: fallbackEstimatedPrice,
       lineTotal: fallbackEstimatedPrice,
+      explainability: null,
     }]
   }
   return value.map((raw) => {
@@ -74,7 +75,11 @@ function parseLineItems(value: unknown, fallbackEstimatedPrice: number): QuoteLi
     if (typeof item.description !== 'string' || item.description.trim().length === 0) return null
     const quantity = Number(item.quantity)
     const unitPrice = Number(item.unitPrice)
-    return {
+    const explainability =
+      item.explainability && typeof item.explainability === 'object'
+        ? (item.explainability as QuoteLineItem['explainability'])
+        : null
+    const parsed: QuoteLineItem = {
       id: typeof item.id === 'string' && item.id.trim().length > 0 ? item.id : randomUUID(),
       sourceItemId: typeof item.sourceItemId === 'string' ? item.sourceItemId : null,
       description: item.description.trim(),
@@ -83,6 +88,8 @@ function parseLineItems(value: unknown, fallbackEstimatedPrice: number): QuoteLi
       unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
       lineTotal: 0,
     }
+    if (explainability) parsed.explainability = explainability
+    return parsed
   }).filter((item): item is QuoteLineItem => item !== null)
 }
 
@@ -233,3 +240,4 @@ export async function deleteQuoteForServiceProvider(quoteId: string, serviceProv
   await quoteRef(quoteId).delete()
   return true
 }
+
