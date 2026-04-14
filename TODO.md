@@ -97,10 +97,18 @@ Phase status: **Completed**
 ---
 
 ## Phase 3 - Evaluation Harness
-- [ ] Define metrics: `MAE`, `MAPE`, `SMAPE`, `MedianAE`.
-- [ ] Add time-based split + random split evaluation.
-- [ ] Add baseline rule model (median/quantile by item/unit).
-- [ ] Build eval script with JSON output + markdown summary.
+- [x] Define metrics: `MAE`, `MAPE`, `SMAPE`, `MedianAE`.
+- [x] Add time-based split + random split evaluation.
+- [x] Add baseline rule model (median/quantile by item/unit).
+- [x] Build eval script with JSON output + markdown summary.
+
+Definition of Done:
+- [x] Evaluation metrics are deterministic and covered by automated tests.
+- [x] Evaluation runs on both random split and time-based split.
+- [x] Baseline predictor supports direct item/unit lookup with unit/global fallback.
+- [x] Evaluation report can be exported as JSON and markdown.
+
+Phase status: **Completed**
 
 ---
 
@@ -145,14 +153,20 @@ Phase status: **Completed**
 ---
 
 ## Next 3 (Immediate)
-- [ ] Phase 3: Define model evaluation baseline and metric contracts (`MAE`, `MAPE`, `SMAPE`, `MedianAE`).
-- [ ] Phase 3: Implement evaluation script (time split + random split + baseline model comparison).
-- [ ] Phase 3: Publish first evaluation report from current production-like dataset snapshot.
+- [ ] Phase 4: Implement initial regression trainer pipeline (CatBoost/XGBoost candidate with fixed feature contract).
+- [ ] Phase 4: Persist model artifact metadata/versioning and add safe loading path.
+- [ ] Phase 4: Add inference fallback policy and smoke-test on at least one provider snapshot.
 
 ---
 
 ## Session Log
 - 2026-04-14:
+  - Completed Phase 3 evaluation harness:
+    - Added deterministic metric service (`MAE`, `MAPE`, `SMAPE`, `MedianAE`) with automated tests.
+    - Added random-split and time-split evaluators for training datasets.
+    - Added baseline model evaluator with item/unit median prediction and fallback tracking.
+    - Added `server/scripts/evaluate-training-dataset.ts` with JSON + markdown export.
+    - Published first evaluation report for provider `tJUQlidFsKeOWi3w8AFMQoWPdQG3` under `server/reports/`.
   - Completed Phase 2 dataset governance foundations:
     - Added deterministic dataset fingerprint and dataset version id.
     - Persisted fixed dataset snapshot metrics on completed training jobs.
