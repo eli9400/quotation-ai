@@ -11,6 +11,7 @@ export type EditableLineItem = {
   quantity: string
   unitPrice: string
   autoPriced: boolean
+  explainability?: QuoteLineItem['explainability']
 }
 
 export type EditableQuoteState = {
@@ -36,6 +37,7 @@ export function toEditableState(record: StoredQuoteRecord): EditableQuoteState {
       quantity: String(item.quantity),
       unitPrice: String(item.unitPrice),
       autoPriced: false,
+      explainability: item.explainability ?? null,
     })),
     customFields: record.quote.customFields.map((field) => ({
       id: field.id,
@@ -154,7 +156,7 @@ function parseLineItems(lineItems: EditableLineItem[]): QuoteLineItem[] {
       if (!isPercentLine && !Number.isFinite(unitPrice)) {
         return null
       }
-      return {
+      const parsedLine: QuoteLineItem = {
         id: line.id || crypto.randomUUID(),
         sourceItemId: line.sourceItemId,
         description: line.description.trim(),
@@ -162,7 +164,9 @@ function parseLineItems(lineItems: EditableLineItem[]): QuoteLineItem[] {
         quantity,
         unitPrice,
         lineTotal: 0,
-      } satisfies QuoteLineItem
+      }
+      if (line.explainability) parsedLine.explainability = line.explainability
+      return parsedLine
     })
     .filter((line): line is QuoteLineItem => line !== null)
 

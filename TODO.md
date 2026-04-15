@@ -1,6 +1,6 @@
 ﻿# Quotation AI - TODO Roadmap
 
-Last updated: 2026-04-14  
+Last updated: 2026-04-15  
 Overall status: In Progress
 
 ---
@@ -139,10 +139,12 @@ Phase status: **Completed**
 ---
 
 ## Phase 6 - Serving + UX
-- [ ] Hybrid decision engine: Rules -> ML -> LLM explanation.
-- [ ] Explainability at line-item level.
-- [ ] Real-time anomaly warnings during quote generation.
-- [ ] Ensure manual category overrides affect inference.
+- [x] Hybrid decision engine: Rules -> ML -> LLM explanation.
+- [x] Explainability at line-item level.
+- [x] Real-time anomaly warnings during quote generation.
+- [x] Ensure manual category overrides affect inference.
+
+Phase status: **Completed**
 
 ---
 
@@ -163,14 +165,21 @@ Phase status: **Completed**
 ---
 
 ## Next 3 (Immediate)
-- [ ] Phase 6: Implement hybrid decision engine order (`Rules -> ML -> LLM explanation`) end-to-end.
-- [ ] Phase 6: Add explainability payload per line-item (source, confidence, fallback path).
-- [ ] Phase 6: Verify manual category overrides affect inference outputs.
+- [ ] Phase 7: Implement scheduled retraining with canary rollout and rollback hooks.
+- [ ] Phase 7: Add prediction error tracking from approved quotes and expose trend metrics.
+- [ ] Phase 7: Add quality-drop / drift alert thresholds with operational runbook.
 
 ---
 
 ## Session Log
 - 2026-04-14:
+  - Completed Phase 6 (Serving + UX):
+    - Enforced hybrid serving order end-to-end (`rules -> model blend -> LLM calibration`) in learned quote generation.
+    - Added line-level explainability payload on every generated line (`pipeline`, `pricingMethod`, `coverageTier`, model source/uncertainty, fallback key, anomaly warnings).
+    - Added anomaly warning synthesis into generated quote assumptions for immediate operator visibility.
+    - Added category-aware similar-item fallback in inference, sourced from provider line-item categories (including manual category overrides).
+    - Added regression tests for explainability and category-aware fallback behavior.
+    - Preserved explainability through quote load/edit/save flows (backend normalization + frontend mapping/editor state).
   - Completed Phase 5 (Advanced Model V2):
     - Implemented controlled fuzzy merge with strict guards to avoid over-merge of distinct variants.
     - Added regression tests for merge/split behavior across plumbing and window-installation style variants.

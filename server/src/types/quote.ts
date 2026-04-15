@@ -32,6 +32,33 @@ export type QuoteLineItem = {
   quantity: number
   unitPrice: number
   lineTotal: number
+  explainability?: QuoteLineExplainability | null
+}
+
+export type QuoteLineAnomalyWarning = {
+  code:
+    | 'low_coverage'
+    | 'manual_review'
+    | 'clamped_price'
+    | 'global_fallback'
+    | 'high_uncertainty'
+    | 'llm_large_adjustment'
+    | 'similar_item_fallback'
+    | 'market_pricing'
+  severity: 'info' | 'warn'
+  message: string
+}
+
+export type QuoteLineExplainability = {
+  pipeline: 'rules_only' | 'rules_ml' | 'rules_ml_llm' | 'llm_market'
+  pricingMethod: string
+  coverageTier: 'high' | 'medium' | 'low' | 'n/a'
+  referenceItemKey: string | null
+  categoryId: string | null
+  modelSource: 'direct_item_unit' | 'unit_fallback' | 'global_fallback' | 'none'
+  modelUncertainty: number | null
+  llmAdjustmentPct: number | null
+  anomalyWarnings: QuoteLineAnomalyWarning[]
 }
 
 export type QuoteCustomField = {

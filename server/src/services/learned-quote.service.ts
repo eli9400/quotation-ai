@@ -8,17 +8,17 @@ import {
 } from './learned-quote-utils.service.js'
 import { buildMarketPricedLines } from './market-quote-lines.service.js'
 import { calibrateUnitPricesWithOpenAi } from './openai-line-pricing.service.js'
-import { listProviderPricingItemsWithIndustryBaseline } from './pricing-items-source.service.js'
 import { buildGroundedPricingLines } from './pricing-engine.service.js'
+import { listProviderPricingItemsWithIndustryBaseline } from './pricing-items-source.service.js'
+import {
+  buildGroundedLineExplainability,
+  buildMarketLineExplainability,
+  toAnomalyAssumptions,
+} from './quote-line-explainability.service.js'
 import { applyCpiFactorToUnitPrice } from './quote-pricing-adjustments.service.js'
 import { resolveRequestedSourceItemId } from './requested-item-grounding.service.js'
 import { getServiceProviderByUid } from './service-providers.service.js'
-import type {
-  GeneratedQuote,
-  QuoteClientRequest,
-  QuoteLineItem,
-  QuoteRequestedItem,
-} from '../types/quote.js'
+import type { GeneratedQuote, QuoteClientRequest, QuoteLineItem, QuoteRequestedItem } from '../types/quote.js'
 
 type GenerateLearnedQuoteInput = {
   serviceProviderUid: string
@@ -42,7 +42,24 @@ function toPersistedLineItems(lines: InternalPricedLine[]): QuoteLineItem[] {
     quantity: line.quantity,
     unitPrice: line.unitPrice,
     lineTotal: line.lineTotal,
+    explainability: line.explainability ?? null,
   }))
+}
+
+function toHybridAssumptions(input: {
+  lineCount: number
+  manualReviewCount: number
+  marketCount: number
+  skippedCount: number
+  anomalyAssumptions: string[]
+}): string[] {
+  return [
+    `Hybrid engine path applied on ${input.lineCount} line(s): rules -> ML blend -> LLM explanation.`,
+    `Manual review recommended for ${input.manualReviewCount} line(s).`,
+    `Market-only pricing (no learned history): ${input.marketCount} line(s).`,
+    `Requested items skipped due unresolved source mapping: ${input.skippedCount}.`,
+    ...input.anomalyAssumptions,
+  ]
 }
 
 export async function generateLearnedQuote(
@@ -92,6 +109,7 @@ export async function generateLearnedQuote(
       requirements: input.request.requirements,
     },
   })
+  const groundedByLineId = new Map(grounded.lines.map((line) => [line.id, line]))
 
   const lineItems: InternalPricedLine[] = grounded.lines.map((line) => ({
     id: line.id,
@@ -106,8 +124,10 @@ export async function generateLearnedQuote(
     pricingMethod: line.pricingMethod,
     coverageTier: line.coverage.tier,
     needsManualReview: line.needsManualReview,
+    explainability: null,
   }))
 
+  const llmAdjustmentByLineId = new Map<string, number>()
   if (lineItems.length > 0) {
     try {
       const calibrated = await calibrateUnitPricesWithOpenAi(
@@ -134,6 +154,9 @@ export async function generateLearnedQuote(
             adjustment.adjustmentPct,
             calibrationDeltaForLine(line),
           )
+          if (line.baseUnitPrice > 0) {
+            llmAdjustmentByLineId.set(line.id, (line.unitPrice - line.baseUnitPrice) / line.baseUnitPrice)
+          }
         })
       }
     } catch (error) {
@@ -147,13 +170,7 @@ export async function generateLearnedQuote(
     try {
       cpiAdjustment = await resolveCpiAdjustmentForQuote({
         serviceProviderUid: input.serviceProviderUid,
-        itemKeys: Array.from(
-          new Set(
-            lineItems
-              .map((line) => line.itemKey)
-              .filter((itemKey): itemKey is string => typeof itemKey === 'string' && itemKey.length > 0),
-          ),
-        ),
+        itemKeys: Array.from(new Set(lineItems.map((line) => line.itemKey).filter((value): value is string => Boolean(value)))),
         itemQuantities: lineItems
           .filter((line) => line.itemKey)
           .map((line) => ({ itemKey: line.itemKey ?? '', quantity: line.quantity })),
@@ -163,42 +180,48 @@ export async function generateLearnedQuote(
       console.warn(`[learned-quote] CPI factor resolution skipped: ${message}`)
     }
   }
-
   if (cpiAdjustment?.enabled) {
     lineItems.forEach((line) => {
-      if (!line.sourceItemId) return
-      line.unitPrice = applyCpiFactorToUnitPrice(line.unitPrice, cpiAdjustment)
+      if (line.sourceItemId) line.unitPrice = applyCpiFactorToUnitPrice(line.unitPrice, cpiAdjustment)
     })
   }
 
   const marketLines = await buildMarketPricedLines(input.request, marketRequested)
-  const allLines = [...lineItems, ...marketLines]
+  const allLines: InternalPricedLine[] = [...lineItems, ...marketLines].map((line) => {
+    const groundedLine = groundedByLineId.get(line.id)
+    if (groundedLine) {
+      return {
+        ...line,
+        explainability: buildGroundedLineExplainability(
+          groundedLine,
+          llmAdjustmentByLineId.get(line.id) ?? null,
+        ),
+      }
+    }
+    return { ...line, explainability: buildMarketLineExplainability(line.pricingMethod) }
+  })
   if (allLines.length === 0) return null
 
-  const estimatedDays = estimateDays(allLines)
-  const confidence = estimateConfidence(
-    allLines.map((line) => ({
-      coverageTier: line.coverageTier,
-      needsManualReview: line.needsManualReview,
-    })),
-  )
+  const persistedLineItems = toPersistedLineItems(allLines)
+  const anomalyAssumptions = toAnomalyAssumptions(persistedLineItems)
   const manualReviewCount = allLines.filter((line) => line.needsManualReview).length
   const marketCount = marketLines.length
 
   return buildQuoteFromLineItems({
-    lineItems: toPersistedLineItems(allLines),
+    lineItems: persistedLineItems,
     pricingAdjustments: { cpi: cpiAdjustment },
     vatRate: 17,
-    estimatedDays,
-    confidence,
-    summary: `תמחור מבוסס היסטוריה נבנה עבור ${allLines.length} רכיבי עבודה שביקש הלקוח.`,
-    assumptions: [
-      'מחיר הבסיס לכל שורה חושב מנתוני עבר מאומתים של אותו רכיב.',
-      'שיטת החישוב הראשית: חציון לפי טווחי כמות, עם גיבוי אינטרפולציה לינארית בעת צורך.',
-      `מומלץ מעבר ידני עבור ${manualReviewCount} שורות עם כיסוי נתונים נמוך או רכיב חדש.`,
-      `רכיבים חדשים ללא היסטוריה שתומחרו לפי ממוצע שוק (LLM): ${marketCount}.`,
-      `רכיבים שלא זוהו ולכן לא חושבו: ${grounded.skippedSourceItemIds.length}.`,
-      'מע"מ 17% מחושב על סכום הביניים.',
-    ],
+    estimatedDays: estimateDays(allLines),
+    confidence: estimateConfidence(
+      allLines.map((line) => ({ coverageTier: line.coverageTier, needsManualReview: line.needsManualReview })),
+    ),
+    summary: `Pricing generated for ${allLines.length} requested line-item(s) using learned provider history.`,
+    assumptions: toHybridAssumptions({
+      lineCount: allLines.length,
+      manualReviewCount,
+      marketCount,
+      skippedCount: grounded.skippedSourceItemIds.length,
+      anomalyAssumptions,
+    }),
   })
 }
