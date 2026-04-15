@@ -1,5 +1,6 @@
 import { estimateUnitPriceLinear, exactMatchUnitPrice } from './line-pricing-utils.service.js'
 import { createModelV1Predictor } from './model-v1-inference.service.js'
+import { listProviderLineItemOptions } from './provider-line-items.service.js'
 import {
   estimateBinnedMedianPrice,
   resolveExamples,
@@ -57,6 +58,18 @@ export type GroundedPricingLine = {
   sourceExamples: GroundedPriceExample[]
   needsManualReview: boolean
   referenceItemKey: string | null
+  inferenceCategoryId: string | null
+  priceWasClamped: boolean
+  mlDecision: GroundedMlDecision | null
+}
+
+export type GroundedMlDecision = {
+  applied: boolean
+  source: 'direct_item_unit' | 'unit_fallback' | 'global_fallback'
+  uncertaintyScore: number
+  p25: number
+  p50: number
+  p75: number
 }
 
 export type BuildGroundedPricingResult = {
@@ -67,6 +80,32 @@ export type BuildGroundedPricingResult = {
 type DatasetItemStatsLookup = {
   exampleCount: number
   documentCount: number
+}
+
+type InjectedModelPredictor = {
+  predict: (input: {
+    itemKey?: string | null
+    itemName?: string | null
+    unit: string
+    quantity: number
+    industry?: string | null
+    projectType?: string | null
+    scope?: string | null
+    urgency?: string | null
+    requirements?: string | null
+    inventorySurplus?: number | null
+    availableWorkers?: number | null
+  }) =>
+    | {
+        unitPrice: number
+        p25: number
+        p50: number
+        p75: number
+        uncertaintyScore: number
+        source: 'direct_item_unit' | 'unit_fallback' | 'global_fallback'
+        modelArtifactId: string
+      }
+    | null
 }
 
 const HIGH_COVERAGE_THRESHOLD = 20
@@ -145,11 +184,17 @@ function findSimilarItem(
   target: LearnedPricingItem,
   items: LearnedPricingItem[],
   statsLookup: Map<string, DatasetItemStatsLookup>,
+  categoryBySourceItemId: Map<string, string>,
+  targetCategoryId: string | null,
 ): LearnedPricingItem | null {
   const targetTokens = tokenize(`${target.canonicalName} ${(target.aliases ?? []).join(' ')}`)
   let best: { item: LearnedPricingItem; score: number } | null = null
   for (const candidate of items) {
     if (candidate.id === target.id || candidate.unit !== target.unit) continue
+    if (targetCategoryId) {
+      const candidateCategoryId = categoryBySourceItemId.get(candidate.id) ?? null
+      if (!candidateCategoryId || candidateCategoryId !== targetCategoryId) continue
+    }
     const coverage = resolveCoverage(candidate, statsLookup)
     if (coverage.exampleCount < MEDIUM_COVERAGE_THRESHOLD) continue
     const candidateTokens = tokenize(`${candidate.canonicalName} ${(candidate.aliases ?? []).join(' ')}`)
@@ -172,6 +217,13 @@ async function createDatasetStatsLookup(
   return new Map(entries)
 }
 
+async function createCategoryLookup(
+  serviceProviderUid: string,
+): Promise<Map<string, string>> {
+  const options = await listProviderLineItemOptions(serviceProviderUid)
+  return new Map(options.map((option) => [option.id, option.categoryId]))
+}
+
 export async function buildGroundedPricingLines(input: {
   serviceProviderUid: string
   requestedItems: QuoteRequestedItem[]
@@ -183,9 +235,17 @@ export async function buildGroundedPricingLines(input: {
     urgency?: string | null
     requirements?: string | null
   }
+  categoryBySourceItemId?: Map<string, string>
+  statsLookup?: Map<string, DatasetItemStatsLookup>
+  modelPredictor?: InjectedModelPredictor | null
 }): Promise<BuildGroundedPricingResult> {
-  const statsLookup = await createDatasetStatsLookup(input.serviceProviderUid)
-  const modelPredictor = await createModelV1Predictor(input.serviceProviderUid)
+  const statsLookup = input.statsLookup ?? (await createDatasetStatsLookup(input.serviceProviderUid))
+  const categoryBySourceItemId =
+    input.categoryBySourceItemId ?? (await createCategoryLookup(input.serviceProviderUid))
+  const modelPredictor =
+    input.modelPredictor === undefined
+      ? await createModelV1Predictor(input.serviceProviderUid)
+      : input.modelPredictor
   const learnedById = new Map(input.learnedItems.map((item) => [item.id, item]))
   const skippedSourceItemIds: string[] = []
   const lines: GroundedPricingLine[] = []
@@ -208,6 +268,7 @@ export async function buildGroundedPricingLines(input: {
 
     const quantity = round2(requested.quantity)
     const coverage = resolveCoverage(item, statsLookup)
+    const itemCategoryId = categoryBySourceItemId.get(item.id) ?? null
     const exactPrice = exactMatchUnitPrice(item, quantity)
     const binnedPrice = estimateBinnedMedianPrice(item, quantity)
     const stats = resolvePriceStats(resolveExamples(item, quantity, EXAMPLES_LIMIT))
@@ -223,9 +284,16 @@ export async function buildGroundedPricingLines(input: {
             : 'trend_fallback'
     let referenceItemKey: string | null = null
     let needsManualReview = coverage.tier === 'low'
+    let mlDecision: GroundedMlDecision | null = null
 
     if (coverage.tier === 'low') {
-      const similarItem = findSimilarItem(item, input.learnedItems, statsLookup)
+      const similarItem = findSimilarItem(
+        item,
+        input.learnedItems,
+        statsLookup,
+        categoryBySourceItemId,
+        itemCategoryId,
+      )
       if (similarItem) {
         const similarPrice =
           exactMatchUnitPrice(similarItem, quantity) ??
@@ -254,6 +322,14 @@ export async function buildGroundedPricingLines(input: {
         requirements: input.requestFeatures?.requirements ?? null,
       })
       if (predicted) {
+        mlDecision = {
+          applied: false,
+          source: predicted.source,
+          uncertaintyScore: predicted.uncertaintyScore,
+          p25: predicted.p25,
+          p50: predicted.p50,
+          p75: predicted.p75,
+        }
         const deltaRatio = Math.abs(predicted.p50 - safeUnitPrice) / Math.max(1, safeUnitPrice)
         const maxRatioBase = coverage.tier === 'high' ? 0.25 : coverage.tier === 'medium' ? 0.45 : 0.8
         const sourceFactor =
@@ -279,6 +355,7 @@ export async function buildGroundedPricingLines(input: {
           const highBound = Math.max(safeUnitPrice, predicted.p75)
           finalUnitPrice = round2(clamp(blended, lowBound, highBound))
           method = 'model_v1_blend'
+          mlDecision.applied = true
         }
         const uncertaintyThreshold =
           predicted.source === 'direct_item_unit'
@@ -311,6 +388,9 @@ export async function buildGroundedPricingLines(input: {
       sourceExamples: resolveExamples(item, quantity, EXAMPLES_LIMIT),
       needsManualReview: needsManualReview || wasClamped,
       referenceItemKey,
+      inferenceCategoryId: itemCategoryId,
+      priceWasClamped: wasClamped,
+      mlDecision,
     })
   })
 
