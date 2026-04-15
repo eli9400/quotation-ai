@@ -1,6 +1,6 @@
 ﻿# Quotation AI - TODO Roadmap
 
-Last updated: 2026-04-14  
+Last updated: 2026-04-15  
 Overall status: In Progress
 
 ---
