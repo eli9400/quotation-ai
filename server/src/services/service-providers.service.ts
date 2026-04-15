@@ -258,3 +258,9 @@ export async function setServiceProviderIndustry(
   await db.collection(SERVICE_PROVIDERS_COLLECTION).doc(uid).set(nextProfile, { merge: true })
   return nextProfile
 }
+
+export async function listServiceProviderUids(): Promise<string[]> {
+  const db = getFirestoreDb()
+  const snapshot = await db.collection(SERVICE_PROVIDERS_COLLECTION).get()
+  return snapshot.docs.map((doc) => doc.id).filter((id) => id.trim().length > 0)
+}

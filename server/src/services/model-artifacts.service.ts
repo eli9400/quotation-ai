@@ -83,12 +83,30 @@ async function listProviderArtifacts(serviceProviderUid: string): Promise<ModelV
   return snapshot.docs.map((doc) => normalizeArtifact(doc.data() as ModelV1Artifact))
 }
 
+export async function listProviderModelV1Artifacts(
+  serviceProviderUid: string,
+): Promise<ModelV1Artifact[]> {
+  const artifacts = await listProviderArtifacts(serviceProviderUid)
+  return artifacts.sort((left, right) => right.trainedAt.localeCompare(left.trainedAt))
+}
+
+export async function getModelV1ArtifactById(
+  serviceProviderUid: string,
+  artifactId: string,
+): Promise<ModelV1Artifact | null> {
+  const db = getFirestoreDb()
+  const snapshot = await db.collection(MODEL_ARTIFACTS_COLLECTION).doc(artifactId).get()
+  if (!snapshot.exists) return null
+  const artifact = normalizeArtifact(snapshot.data() as ModelV1Artifact)
+  if (artifact.serviceProviderUid !== serviceProviderUid || artifact.modelVersion !== 'v1') return null
+  return artifact
+}
+
 export async function getLatestActiveModelV1Artifact(
   serviceProviderUid: string,
 ): Promise<ModelV1Artifact | null> {
   const cached = getCached(serviceProviderUid)
   if (cached !== undefined) return cached
-
   const artifacts = await listProviderArtifacts(serviceProviderUid)
   const active = artifacts
     .filter((artifact) => artifact.active)
@@ -96,6 +114,43 @@ export async function getLatestActiveModelV1Artifact(
   const resolved = active ?? null
   setCached(serviceProviderUid, resolved)
   return resolved
+}
+
+export async function saveModelV1Artifact(input: {
+  serviceProviderUid: string
+  datasetVersionId: string | null
+  datasetFingerprint: string | null
+  featureSchemaVersion: string
+  payload: ModelV1Artifact['payload']
+  metrics: ModelV1Artifact['metrics']
+  active: boolean
+}): Promise<ModelV1Artifact> {
+  const db = getFirestoreDb()
+  const artifact: ModelV1Artifact = {
+    id: `${input.serviceProviderUid}_${randomUUID().slice(0, 12)}`,
+    serviceProviderUid: input.serviceProviderUid,
+    modelVersion: 'v1',
+    algorithm: 'linear_quantity_v1',
+    active: input.active,
+    trainedAt: nowIso(),
+    datasetVersionId: input.datasetVersionId,
+    datasetFingerprint: input.datasetFingerprint,
+    featureSchemaVersion: input.featureSchemaVersion,
+    metrics: input.metrics,
+    payload: input.payload,
+  }
+  const batch = db.batch()
+  if (input.active) {
+    const existing = await listProviderArtifacts(input.serviceProviderUid)
+    existing
+      .filter((row) => row.active)
+      .forEach((row) => batch.update(db.collection(MODEL_ARTIFACTS_COLLECTION).doc(row.id), { active: false }))
+  }
+  batch.set(db.collection(MODEL_ARTIFACTS_COLLECTION).doc(artifact.id), artifact)
+  await batch.commit()
+  invalidateCache(input.serviceProviderUid)
+  if (input.active) setCached(input.serviceProviderUid, artifact)
+  return artifact
 }
 
 export async function saveAndActivateModelV1Artifact(input: {
@@ -106,33 +161,36 @@ export async function saveAndActivateModelV1Artifact(input: {
   payload: ModelV1Artifact['payload']
   metrics: ModelV1Artifact['metrics']
 }): Promise<ModelV1Artifact> {
-  const db = getFirestoreDb()
-  const id = `${input.serviceProviderUid}_${randomUUID().slice(0, 12)}`
-  const trainedAt = nowIso()
-  const artifact: ModelV1Artifact = {
-    id,
-    serviceProviderUid: input.serviceProviderUid,
-    modelVersion: 'v1',
-    algorithm: 'linear_quantity_v1',
-    active: true,
-    trainedAt,
-    datasetVersionId: input.datasetVersionId,
-    datasetFingerprint: input.datasetFingerprint,
-    featureSchemaVersion: input.featureSchemaVersion,
-    metrics: input.metrics,
-    payload: input.payload,
-  }
+  return saveModelV1Artifact({ ...input, active: true })
+}
 
-  const existing = await listProviderArtifacts(input.serviceProviderUid)
+export async function activateModelV1Artifact(
+  serviceProviderUid: string,
+  artifactId: string,
+): Promise<ModelV1Artifact | null> {
+  const artifacts = await listProviderArtifacts(serviceProviderUid)
+  const target = artifacts.find((artifact) => artifact.id === artifactId)
+  if (!target) return null
+  const db = getFirestoreDb()
   const batch = db.batch()
-  existing
-    .filter((row) => row.active)
-    .forEach((row) =>
-      batch.update(db.collection(MODEL_ARTIFACTS_COLLECTION).doc(row.id), { active: false }),
-    )
-  batch.set(db.collection(MODEL_ARTIFACTS_COLLECTION).doc(artifact.id), artifact)
+  artifacts
+    .filter((artifact) => artifact.active && artifact.id !== artifactId)
+    .forEach((artifact) => batch.update(db.collection(MODEL_ARTIFACTS_COLLECTION).doc(artifact.id), { active: false }))
+  batch.update(db.collection(MODEL_ARTIFACTS_COLLECTION).doc(artifactId), { active: true })
   await batch.commit()
-  invalidateCache(input.serviceProviderUid)
-  setCached(input.serviceProviderUid, artifact)
-  return artifact
+  const resolved = { ...target, active: true }
+  invalidateCache(serviceProviderUid)
+  setCached(serviceProviderUid, resolved)
+  return resolved
+}
+
+export async function rollbackToPreviousModelV1Artifact(
+  serviceProviderUid: string,
+): Promise<ModelV1Artifact | null> {
+  const artifacts = await listProviderModelV1Artifacts(serviceProviderUid)
+  const active = artifacts.find((artifact) => artifact.active) ?? null
+  if (!active) return null
+  const previous = artifacts.find((artifact) => artifact.id !== active.id) ?? null
+  if (!previous) return null
+  return activateModelV1Artifact(serviceProviderUid, previous.id)
 }

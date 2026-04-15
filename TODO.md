@@ -149,10 +149,12 @@ Phase status: **Completed**
 ---
 
 ## Phase 7 - Monitoring & Continuous Retraining
-- [ ] Scheduled retraining with canary rollout.
-- [ ] Track prediction error vs approved quotes.
-- [ ] Alerts on quality drop / drift increase.
-- [ ] Fast rollback to previous model version.
+- [x] Scheduled retraining with canary rollout.
+- [x] Track prediction error vs approved quotes.
+- [x] Alerts on quality drop / drift increase.
+- [x] Fast rollback to previous model version.
+
+Phase status: **Completed**
 
 ---
 
@@ -165,13 +167,26 @@ Phase status: **Completed**
 ---
 
 ## Next 3 (Immediate)
-- [ ] Phase 7: Implement scheduled retraining with canary rollout and rollback hooks.
-- [ ] Phase 7: Add prediction error tracking from approved quotes and expose trend metrics.
-- [ ] Phase 7: Add quality-drop / drift alert thresholds with operational runbook.
+- [ ] Phase 8: Expand automated tests for parser/normalizer/training/inference edge-cases.
+- [ ] Phase 8: Add E2E coverage for upload -> train -> quote -> approve flow.
+- [ ] Phase 8: Define backup/restore procedure for training/model collections.
 
 ---
 
 ## Session Log
+- 2026-04-15:
+  - Completed Phase 7 (Monitoring & Continuous Retraining):
+    - Added prediction-error tracking from approved quotes and rolling provider metrics (`MAE`, `MAPE`, `SMAPE`).
+    - Added model quality alerts for prediction degradation vs active model baseline and dataset drift severity.
+    - Added monitoring API endpoint for active metrics/alerts/rollout state.
+    - Added fast rollback endpoint to previous model artifact activation.
+  - Started Phase 7 (Monitoring & Continuous Retraining):
+    - Added scheduled model retraining runner (env-gated) with canary training mode.
+    - Added canary rollout storage/service with deterministic traffic split and manual promote/rollback hooks.
+    - Added rollout quality gate (MAE/SMAPE degradation thresholds) with automatic rollback-on-start when gate fails.
+    - Integrated canary-aware artifact resolution into model inference path.
+    - Added authenticated rollout endpoints: status, train-v1 (activate/canary), promote, rollback.
+    - Added tests for canary gating/split behavior and updated env templates/docs for scheduler controls.
 - 2026-04-14:
   - Completed Phase 6 (Serving + UX):
     - Enforced hybrid serving order end-to-end (`rules -> model blend -> LLM calibration`) in learned quote generation.
