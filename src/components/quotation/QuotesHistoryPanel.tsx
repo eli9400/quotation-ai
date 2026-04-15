@@ -64,7 +64,7 @@ function rowClassName(record: StoredQuoteRecord, selectedId: string | null): str
 export function QuotesHistoryPanel({ authToken, records, isLoading }: QuotesHistoryPanelProps) {
   const [localRecords, setLocalRecords] = useState<StoredQuoteRecord[]>(records)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('draft')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -108,7 +108,14 @@ export function QuotesHistoryPanel({ authToken, records, isLoading }: QuotesHist
   const selectedRecord = useMemo(() => localRecords.find((record) => record.id === selectedId) ?? null, [localRecords, selectedId])
   const filteredRecords = useMemo(() => {
     return localRecords.filter((record) => {
-      const statusOk = statusFilter === 'all' ? true : record.status === statusFilter
+      let statusOk = true
+      if (statusFilter === 'draft') {
+        statusOk = record.status === 'draft' || record.clientRevisionPending
+      } else if (statusFilter === 'approved') {
+        statusOk = record.status === 'approved' && !record.clientRevisionPending
+      } else if (statusFilter === 'completed') {
+        statusOk = record.status === 'completed'
+      }
       return statusOk && inDateRange(record, dateFrom, dateTo)
     })
   }, [localRecords, statusFilter, dateFrom, dateTo])
@@ -213,7 +220,7 @@ export function QuotesHistoryPanel({ authToken, records, isLoading }: QuotesHist
                   <td>{record.clientRequest.clientEmail || '-'}</td>
                   <td>{formatCurrencyIls(record.quote.estimatedPrice)}</td>
                   <td>{SOURCE_LABEL[record.source]}</td>
-                  <td>{STATUS_LABEL[record.status]}</td>
+                  <td>{record.clientRevisionPending ? 'מחכה לאישור מחדש' : STATUS_LABEL[record.status]}</td>
                   <td>{new Date(record.createdAt).toLocaleString('he-IL')}</td>
                 </tr>
               ))}

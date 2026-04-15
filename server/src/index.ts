@@ -2,6 +2,7 @@ import 'dotenv/config'
 import { app } from './app.js'
 import { env } from './config/env.js'
 import { getFirebaseConfigStatus, initializeFirebaseIfConfigured } from './config/firebase.js'
+import { startModelRetrainingScheduler } from './services/model-retraining-scheduler.service.js'
 
 app.listen(env.port, () => {
   try {
@@ -17,5 +18,6 @@ app.listen(env.port, () => {
     process.exit(1)
     return
   }
+  startModelRetrainingScheduler()
   console.log(`[server] listening on http://localhost:${env.port}`)
 })

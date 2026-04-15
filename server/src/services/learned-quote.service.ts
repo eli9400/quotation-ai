@@ -33,6 +33,16 @@ type InternalPricedLine = QuoteLineItem & {
   needsManualReview: boolean
 }
 
+function buildInferenceRoutingKey(request: QuoteClientRequest): string {
+  return [
+    request.clientEmail,
+    request.projectType,
+    request.scope,
+    request.urgency,
+    request.requirements.slice(0, 240),
+  ].join('|')
+}
+
 function toPersistedLineItems(lines: InternalPricedLine[]): QuoteLineItem[] {
   return lines.map((line) => ({
     id: line.id,
@@ -101,6 +111,7 @@ export async function generateLearnedQuote(
     serviceProviderUid: input.serviceProviderUid,
     requestedItems: groundedRequested,
     learnedItems,
+    inferenceRoutingKey: buildInferenceRoutingKey(input.request),
     industry: profile?.industry ?? null,
     requestFeatures: {
       projectType: input.request.projectType,

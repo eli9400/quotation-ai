@@ -94,6 +94,9 @@ export function QuoteDetailsForm(props: QuoteDetailsFormProps) {
   } = props
 
   const editorDisabled = isBusy || isReadOnly
+  const parsedCpiFactor = Number(state.cpiFactor)
+  const cpiFactor = Number.isFinite(parsedCpiFactor) && parsedCpiFactor > 0 ? parsedCpiFactor : 1
+  const hasEffectiveCpi = Math.abs(cpiFactor - 1) >= 0.0005
 
   return (
     <form className="quote-edit-form" onSubmit={onSave}>
@@ -121,22 +124,25 @@ export function QuoteDetailsForm(props: QuoteDetailsFormProps) {
             onChange={(event) => onSetVatRate(event.target.value)}
           />
         </label>
+        {hasEffectiveCpi ? (
+          <>
+            <label className="quote-cpi-toggle">
+              <input
+                type="checkbox"
+                disabled={editorDisabled}
+                checked={state.cpiEnabled}
+                onChange={(event) => onToggleCpi(event.target.checked)}
+              />
+              <span>החל מדד בחישוב</span>
+            </label>
 
-        <label className="quote-cpi-toggle">
-          <input
-            type="checkbox"
-            disabled={editorDisabled}
-            checked={state.cpiEnabled}
-            onChange={(event) => onToggleCpi(event.target.checked)}
-          />
-          <span>החל מדד בחישוב</span>
-        </label>
-
-        <p className="quote-cpi-caption">מקדם מדד אוטומטי: {Number(state.cpiFactor || 1).toFixed(4)}</p>
-        {state.cpiSourceYear || state.cpiTargetYear ? (
-          <p className="quote-cpi-caption">
-            שנת בסיס: {state.cpiSourceYear ?? '-'} | שנת יעד: {state.cpiTargetYear ?? '-'}
-          </p>
+            <p className="quote-cpi-caption">מקדם מדד אוטומטי: {cpiFactor.toFixed(4)}</p>
+            {state.cpiSourceYear || state.cpiTargetYear ? (
+              <p className="quote-cpi-caption">
+                שנת בסיס: {state.cpiSourceYear ?? '-'} | שנת יעד: {state.cpiTargetYear ?? '-'}
+              </p>
+            ) : null}
+          </>
         ) : null}
         <p>סכום שורות: {formatCurrencyIls(totals.subtotalBase)}</p>
         {Math.abs(totals.customAdjustment) > 0.01 ? (
