@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react'
+﻿import { useMemo, useState } from 'react'
 import type { Quote, QuoteLineItem, StoredQuoteRecord } from '../../types/quotation'
 import { formatCurrencyIls } from '../../utils/formatters'
-import { PrimaryButton } from '../ui/PrimaryButton'
 import { QuotePreviewModal } from '../quotation/QuotePreviewModal'
 import { computeCustomFieldsAdjustment } from '../quotation/quoteCustomFieldMath'
 import { computeLineTotals } from '../quotation/quoteLineMath'
 import { toUnitLabel } from '../quotation/unitLabels'
+import { PrimaryButton } from '../ui/PrimaryButton'
 
 type ClientQuotesPanelProps = {
   records: StoredQuoteRecord[]
@@ -14,11 +14,14 @@ type ClientQuotesPanelProps = {
   onRefresh: () => Promise<void>
   onSubmitRevision: (quoteId: string, quote: Quote) => Promise<void>
 }
+
+type ClientQuoteStatusFilter = 'pending' | 'all' | 'approved' | 'completed'
+
 const CLIENT_EDITABLE_UNITS: Array<{ value: string; label: string }> = [
   { value: 'custom', label: 'מותאם' },
   { value: 'sqm', label: 'מ"ר' },
   { value: 'unit', label: 'יחידה' },
-  { value: 'point', label: '����� (�����)' },
+  { value: 'point', label: 'יחידה (ביקור)' },
   { value: 'day', label: 'יום' },
   { value: 'hour', label: 'שעה' },
   { value: 'meter', label: 'מטר' },
@@ -26,17 +29,24 @@ const CLIENT_EDITABLE_UNITS: Array<{ value: string; label: string }> = [
   { value: 'package', label: 'קומפלט' },
   { value: 'percent', label: 'אחוז (%)' },
 ]
+
+function isPendingApproval(record: StoredQuoteRecord): boolean {
+  return record.status === 'draft' || record.clientRevisionPending
+}
+
 function statusLabel(record: StoredQuoteRecord): string {
+  if (record.clientRevisionPending) return 'מחכה לאישור נותן שירות'
   if (record.status === 'completed') return 'בוצעה'
   if (record.status === 'approved') return 'אושרה'
-  if (record.clientRevisionPending) return 'מחכה לאישור נותן שירות'
   return 'בטיפול נותן שירות'
 }
+
 function toRevisionQuote(base: Quote, lineItems: QuoteLineItem[]): Quote {
   const normalizedItems = lineItems.map((line) => ({
     ...line,
     quantity: Number.isFinite(line.quantity) ? line.quantity : 0,
   }))
+
   const totals = computeLineTotals(
     normalizedItems.map((line) => ({
       quantity: line.quantity,
@@ -44,15 +54,18 @@ function toRevisionQuote(base: Quote, lineItems: QuoteLineItem[]): Quote {
       unit: line.unit,
     })),
   )
+
   const withTotals = normalizedItems.map((line, index) => ({
     ...line,
     lineTotal: totals[index] ?? 0,
   }))
+
   const lineSubtotal = withTotals.reduce((sum, line) => sum + line.lineTotal, 0)
   const customAdjustment = computeCustomFieldsAdjustment(base.customFields, lineSubtotal)
   const subtotalBeforeVat = Math.max(0, lineSubtotal + customAdjustment)
   const vatAmount = Math.round(((subtotalBeforeVat * base.vatRate) / 100) * 100) / 100
   const estimatedPrice = Math.round((subtotalBeforeVat + vatAmount) * 100) / 100
+
   return {
     ...base,
     lineItems: withTotals,
@@ -70,6 +83,7 @@ function cloneQuote(quote: Quote): Quote {
     assumptions: [...quote.assumptions],
   }
 }
+
 export function ClientQuotesPanel({
   records,
   isLoading,
@@ -77,20 +91,33 @@ export function ClientQuotesPanel({
   onRefresh,
   onSubmitRevision,
 }: ClientQuotesPanelProps) {
+  const [statusFilter, setStatusFilter] = useState<ClientQuoteStatusFilter>('pending')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draftQuote, setDraftQuote] = useState<Quote | null>(null)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
+
+  const filteredRecords = useMemo(() => {
+    if (statusFilter === 'all') return records
+    if (statusFilter === 'approved') {
+      return records.filter((record) => record.status === 'approved' && !record.clientRevisionPending)
+    }
+    if (statusFilter === 'completed') {
+      return records.filter((record) => record.status === 'completed')
+    }
+    return records.filter(isPendingApproval)
+  }, [records, statusFilter])
+
   const selected = useMemo(
-    () => records.find((record) => record.id === selectedId) ?? null,
-    [records, selectedId],
+    () => filteredRecords.find((record) => record.id === selectedId) ?? null,
+    [filteredRecords, selectedId],
   )
+
+  const revisionAllowed = selected?.status === 'approved' && draftQuote !== null
 
   const openQuote = (record: StoredQuoteRecord) => {
     setSelectedId(record.id)
     setDraftQuote(record.status === 'approved' ? cloneQuote(record.quote) : null)
   }
-
-  const revisionAllowed = selected?.status === 'approved' && draftQuote !== null
 
   const updateLine = (lineId: string, patch: Partial<QuoteLineItem>) => {
     if (!draftQuote) return
@@ -109,13 +136,36 @@ export function ClientQuotesPanel({
     <section className="client-quotes-panel">
       <div className="client-quotes-header">
         <h3>ההצעות שלי</h3>
-        <PrimaryButton type="button" disabled={isLoading || isSubmittingRevision} onClick={() => void onRefresh()}>
+        <PrimaryButton
+          type="button"
+          disabled={isLoading || isSubmittingRevision}
+          onClick={() => void onRefresh()}
+        >
           {isLoading ? 'מרענן...' : 'רענון רשימה'}
         </PrimaryButton>
       </div>
 
+      {records.length > 0 ? (
+        <div className="quotes-filters">
+          <label>
+            סינון סטטוס
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as ClientQuoteStatusFilter)}
+            >
+              <option value="pending">ממתין לאישור</option>
+              <option value="all">הכל</option>
+              <option value="approved">מאושר</option>
+              <option value="completed">בוצע</option>
+            </select>
+          </label>
+        </div>
+      ) : null}
+
       {records.length === 0 ? (
         <p className="auth-status">עדיין אין הצעות מחיר שנשלחו ללקוח זה.</p>
+      ) : filteredRecords.length === 0 ? (
+        <p className="auth-status">אין הצעות להצגה עבור הסינון שנבחר.</p>
       ) : (
         <div className="quotes-table-wrap">
           <table className="quotes-table">
@@ -128,17 +178,28 @@ export function ClientQuotesPanel({
               </tr>
             </thead>
             <tbody>
-              {records.map((record) => (
+              {filteredRecords.map((record) => (
                 <tr key={record.id} className={record.id === selectedId ? 'quote-row active' : 'quote-row'}>
                   <td>{new Date(record.createdAt).toLocaleString('he-IL')}</td>
                   <td>{statusLabel(record)}</td>
-                  <td>{record.status === 'approved' || record.status === 'completed' ? formatCurrencyIls(record.quote.estimatedPrice) : 'ממתין לאישור'}</td>
+                  <td>
+                    {record.status === 'approved' || record.status === 'completed'
+                      ? formatCurrencyIls(record.quote.estimatedPrice)
+                      : 'ממתין לאישור'}
+                  </td>
                   <td>
                     <button type="button" className="quote-line-add" onClick={() => openQuote(record)}>
                       פרטים
                     </button>
                     {record.status === 'approved' ? (
-                      <button type="button" className="quote-line-add" onClick={() => { openQuote(record); setIsPreviewOpen(true) }}>
+                      <button
+                        type="button"
+                        className="quote-line-add"
+                        onClick={() => {
+                          openQuote(record)
+                          setIsPreviewOpen(true)
+                        }}
+                      >
                         PDF
                       </button>
                     ) : null}
@@ -156,9 +217,7 @@ export function ClientQuotesPanel({
           <p>סטטוס: {statusLabel(selected)}</p>
           {selected.status === 'approved' ? (
             <>
-              <p className="quote-cpi-caption">
-                ניתן לערוך כמויות בלבד. מחיר יחידה נקבע על ידי נותן השירות.
-              </p>
+              <p className="quote-cpi-caption">ניתן לערוך כמויות בלבד. מחיר יחידה נקבע על ידי נותן השירות.</p>
               <div className="quote-lines-table-wrap">
                 <table className="quote-lines-table">
                   <thead>
@@ -178,9 +237,7 @@ export function ClientQuotesPanel({
                             type="text"
                             value={line.description}
                             disabled={isSubmittingRevision}
-                            onChange={(event) =>
-                              updateLine(line.id, { description: event.target.value })
-                            }
+                            onChange={(event) => updateLine(line.id, { description: event.target.value })}
                           />
                         </td>
                         <td>
@@ -221,12 +278,18 @@ export function ClientQuotesPanel({
               </div>
               <p>סכום ביניים: {formatCurrencyIls((draftQuote ?? selected.quote).subtotalBeforeVat)}</p>
               <p>מע"מ: {formatCurrencyIls((draftQuote ?? selected.quote).vatAmount)}</p>
-              <p><strong>סה"כ: {formatCurrencyIls((draftQuote ?? selected.quote).estimatedPrice)}</strong></p>
+              <p>
+                <strong>סה"כ: {formatCurrencyIls((draftQuote ?? selected.quote).estimatedPrice)}</strong>
+              </p>
               <div className="auth-actions-row">
                 <PrimaryButton type="button" disabled={isSubmittingRevision} onClick={() => setIsPreviewOpen(true)}>
                   תצוגת PDF
                 </PrimaryButton>
-                <PrimaryButton type="button" disabled={isSubmittingRevision || !revisionAllowed} onClick={() => void handleSubmitRevision()}>
+                <PrimaryButton
+                  type="button"
+                  disabled={isSubmittingRevision || !revisionAllowed}
+                  onClick={() => void handleSubmitRevision()}
+                >
                   {isSubmittingRevision ? 'שולח...' : 'שליחה לאישור נותן שירות'}
                 </PrimaryButton>
               </div>
@@ -248,4 +311,3 @@ export function ClientQuotesPanel({
     </section>
   )
 }
-

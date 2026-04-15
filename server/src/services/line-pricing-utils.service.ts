@@ -128,23 +128,6 @@ function estimateFromPoints(points: QuantityPricePoint[], quantity: number): num
   return round2(clamp(predicted, tail[1].unitPrice * 0.8, tail[0].unitPrice))
 }
 
-function choosePriceClosestToTrend(samples: number[], trend: number): number {
-  return samples
-    .slice()
-    .sort((a, b) => a - b)
-    .reduce((best, current) => {
-      const bestDistance = Math.abs(best - trend)
-      const currentDistance = Math.abs(current - trend)
-      if (currentDistance < bestDistance) {
-        return current
-      }
-      if (currentDistance === bestDistance) {
-        return current < best ? current : best
-      }
-      return best
-    }, samples[0])
-}
-
 export function exactMatchUnitPrice(item: LearnedPricingItem, quantity: number): number | null {
   const grouped = toGroupedSamples(item)
   const key = Array.from(grouped.keys()).find((current) => Math.abs(current - quantity) <= 0.01)
@@ -158,10 +141,7 @@ export function exactMatchUnitPrice(item: LearnedPricingItem, quantity: number):
   if (samples.length === 1) {
     return round2(samples[0])
   }
-
-  const trendPoints = enforceMonotonicDecrease(toSortedPoints(item))
-  const trend = estimateFromPoints(trendPoints, quantity)
-  return round2(choosePriceClosestToTrend(samples, trend))
+  return round2(median(samples))
 }
 
 export function estimateUnitPriceLinear(item: LearnedPricingItem, quantity: number): number {

@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { getFirestoreDb } from '../config/firebase.js'
 import { buildQuoteFromLineItems } from './quote-breakdown.service.js'
+import { evaluatePredictionQualityAlert } from './model-alerts.service.js'
+import { trackApprovedQuotePredictionErrors } from './model-performance-tracking.service.js'
 import { autofillQuoteLinePricesFromTraining } from './provider-quote-autofill.service.js'
 import { rebuildPricingItemsFromDataset } from './pricing-items-dataset-sync.service.js'
 import { syncApprovedQuoteToTrainingDataset } from './training-dataset-approved-quotes.service.js'
@@ -223,6 +225,8 @@ export async function approveQuoteForServiceProvider(quoteId: string, servicePro
   const approvedRecord: StoredQuote = { ...existing, status: 'approved', approvedAt: timestamp, completedAt: null, approvedByServiceProviderUid: serviceProviderUid, updatedAt: timestamp, clientRevisionPending: false }
   await syncApprovedQuoteToTrainingDataset(approvedRecord)
   await rebuildPricingItemsFromDataset(serviceProviderUid)
+  await trackApprovedQuotePredictionErrors(approvedRecord)
+  await evaluatePredictionQualityAlert(serviceProviderUid)
   return approvedRecord
 }
 

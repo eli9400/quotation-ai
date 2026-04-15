@@ -1,4 +1,5 @@
 import { getLatestActiveModelV1Artifact } from './model-artifacts.service.js'
+import { resolveServingModelV1Artifact } from './model-rollout.service.js'
 import {
   buildModelFeatureRowFromInferenceInput,
   validateModelFeatureRow,
@@ -29,11 +30,19 @@ export type ModelV1Prediction = {
   modelArtifactId: string
 }
 
-export async function createModelV1Predictor(serviceProviderUid: string): Promise<{
+export async function createModelV1Predictor(
+  serviceProviderUid: string,
+  options: { routingKey?: string | null } = {},
+): Promise<{
   predict: (input: PredictorInput) => ModelV1Prediction | null
   modelArtifactId: string
 } | null> {
-  const artifact = await getLatestActiveModelV1Artifact(serviceProviderUid)
+  const routingKey = options.routingKey?.trim() || serviceProviderUid
+  const resolved = await resolveServingModelV1Artifact({
+    serviceProviderUid,
+    routingKey,
+  })
+  const artifact = resolved.artifact ?? (await getLatestActiveModelV1Artifact(serviceProviderUid))
   if (!artifact) return null
 
   return {

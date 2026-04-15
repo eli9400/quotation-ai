@@ -79,6 +79,18 @@ FIREBASE_STORAGE_BUCKET=
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
 OPENAI_BASE_URL=https://api.openai.com/v1
+
+# Optional model retraining scheduler
+MODEL_RETRAIN_SCHEDULER_ENABLED=false
+MODEL_RETRAIN_INTERVAL_MINUTES=360
+MODEL_RETRAIN_MIN_EXAMPLES=50
+MODEL_CANARY_TRAFFIC_PERCENT=10
+MODEL_CANARY_MAX_MAE_INCREASE_PCT=0.15
+MODEL_CANARY_MAX_SMAPE_INCREASE_PCT=0.2
+MODEL_ALERTS_ENABLED=true
+MODEL_ALERT_MIN_ERROR_SAMPLES=20
+MODEL_ALERT_MAX_MAE_INCREASE_PCT=0.35
+MODEL_ALERT_MAX_SMAPE_INCREASE_PCT=0.35
 ```
 ## 7) Firebase Admin Setup Options
 ### Option A: Local service account JSON (recommended)
@@ -143,6 +155,13 @@ UI expectations:
   - `npm --prefix server run test`
   - `npm --prefix server run build`
   - `npm --prefix server run audit:training -- --uid=<SERVICE_PROVIDER_UID>`
+  - `npm --prefix server run train:model:v1 -- --uid=<SERVICE_PROVIDER_UID> --mode=canary --canary=10`
+  - Rollout/monitoring API:
+    - `GET /api/model/rollout`
+    - `GET /api/model/monitoring`
+    - `POST /api/model/rollout/promote`
+    - `POST /api/model/rollout/rollback`
+    - `POST /api/model/rollback-previous`
 - Utilities:
   - `npx --prefix server tsx server/scripts/full-retrain.ts --uid=<SERVICE_PROVIDER_UID>`
   - `npx --prefix server tsx server/scripts/normalize-pricing-items.ts --uid=<SERVICE_PROVIDER_UID>`

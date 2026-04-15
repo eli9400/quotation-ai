@@ -238,13 +238,16 @@ export async function buildGroundedPricingLines(input: {
   categoryBySourceItemId?: Map<string, string>
   statsLookup?: Map<string, DatasetItemStatsLookup>
   modelPredictor?: InjectedModelPredictor | null
+  inferenceRoutingKey?: string | null
 }): Promise<BuildGroundedPricingResult> {
   const statsLookup = input.statsLookup ?? (await createDatasetStatsLookup(input.serviceProviderUid))
   const categoryBySourceItemId =
     input.categoryBySourceItemId ?? (await createCategoryLookup(input.serviceProviderUid))
   const modelPredictor =
     input.modelPredictor === undefined
-      ? await createModelV1Predictor(input.serviceProviderUid)
+      ? await createModelV1Predictor(input.serviceProviderUid, {
+          routingKey: input.inferenceRoutingKey ?? input.serviceProviderUid,
+        })
       : input.modelPredictor
   const learnedById = new Map(input.learnedItems.map((item) => [item.id, item]))
   const skippedSourceItemIds: string[] = []

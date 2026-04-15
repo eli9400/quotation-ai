@@ -9,7 +9,7 @@ type LearnResult = {
   learnedItems: number
   processedObservations: number
 }
-const MAX_SAMPLES_PER_ITEM = 60
+const MAX_SAMPLES_PER_ITEM = 180
 
 function nowIso(): string {
   return new Date().toISOString()

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { getFirestoreDb } from '../config/firebase.js'
 import type { TrainingJob, TrainingStage, TrainingStageProgress } from '../types/training.js'
+import { evaluateDatasetDriftAlert } from './model-alerts.service.js'
 import { createCompletedStageProgress, createEmptyStageProgress, isEmptyStageProgress, mergeTrainingStageProgress, normalizeTrainingStage, normalizeTrainingStageProgress } from './training-stage-progress.service.js'
 import { normalizeTrainingDatasetSnapshot } from './training-dataset-snapshot-normalization.service.js'
 
@@ -252,6 +253,10 @@ export async function completeTrainingJob(
     datasetSnapshot: options.datasetSnapshot ?? job.datasetSnapshot ?? null,
   }
   await persistTrainingJob(completed)
+  await evaluateDatasetDriftAlert({
+    serviceProviderUid: completed.serviceProviderUid,
+    datasetSnapshot: completed.datasetSnapshot,
+  })
   return completed
 }
 
